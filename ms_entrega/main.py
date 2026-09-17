@@ -1,3 +1,9 @@
+# Microsservico Entrega (specs.txt): emissao de notas e entrega dos produtos.
+# Exchange eCommerce (tipo direct).
+# Consome: pagamento.aprovado.
+# Apos receber, realiza a emissao da nota e a preparacao da entrega e publica
+# pedido.enviado (informando que o pedido foi enviado).
+# Fila propria: fila.entrega.
 import sys
 import uuid
 from pathlib import Path

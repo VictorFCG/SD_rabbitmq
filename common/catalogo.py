@@ -1,3 +1,7 @@
+# Catalogo de produtos compartilhado (dados de apoio aos processos).
+# Usado pelo MS Principal (visualizar produtos), pelo MS Estoque (verificar
+# disponibilidade e reservar) e pelo MS Promocoes (categoria do produto nas
+# routing keys promocao.categoria.<A|B|C>).
 PRODUTOS = {
     "A1": {"nome": "Notebook Gamer", "categoria": "A", "preco": 4500.00, "estoque": 3},
     "A2": {"nome": "Monitor 27\"", "categoria": "A", "preco": 1500.00, "estoque": 0},

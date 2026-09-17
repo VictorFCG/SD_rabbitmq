@@ -1,3 +1,12 @@
+# Assinatura e validacao digital dos eventos (specs.txt, "Criptografia de Chave
+# Assimetrica").
+# Cada microsservico que publicar um evento deve: gerar um hash do conteudo do
+# evento; assinar o evento com criptografia assimetrica usando a chave privada
+# do produtor; incluir a assinatura digital no campo Signature do envelope.
+# Cada microsservico que consumir deve: obter a chave publica do produtor;
+# verificar a assinatura; confirmar autenticidade e integridade; processar o
+# evento somente se a assinatura for valida (caso contrario, descartar).
+# Algoritmo: RSA + PKCS#1 v1.5 sobre SHA-256 (pycryptodome).
 import base64
 import json
 from pathlib import Path

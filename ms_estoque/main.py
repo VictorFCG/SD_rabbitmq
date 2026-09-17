@@ -1,3 +1,12 @@
+# Microsservico Estoque (specs.txt): gerenciamento do estoque dos produtos.
+# Exchange eCommerce (tipo direct).
+# Consome: pedido.criado e pedido.excluido.
+# Ao receber pedido.criado verifica a disponibilidade dos produtos:
+#   - todos disponiveis -> realiza a reserva/baixa e publica pedido.estoque_ok;
+#   - algum indisponivel -> publica estoque.indisponivel.
+# Ao receber pedido.excluido devolve ao estoque os produtos que haviam sido
+# reservados para o pedido.
+# Fila propria: fila.estoque.
 import sys
 from pathlib import Path
 

@@ -1,3 +1,10 @@
+# Geracao e distribuicao das chaves assimetricas (specs.txt, "Criptografia de
+# Chave Assimetrica"): "Os microsservicos devem possuir as chaves publicas de
+# todos os demais microsservicos. Criem uma pasta para cada microsservico e
+# salvem as chaves publicas nessas pastas."
+# Gera um par RSA por processo: a chave privada fica somente na pasta do seu
+# dono (usada para assinar) e as chaves publicas de todos sao copiadas para a
+# pasta de cada processo (usadas para verificar as assinaturas).
 import shutil
 from pathlib import Path
 

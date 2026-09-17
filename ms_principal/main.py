@@ -1,3 +1,14 @@
+# Microsservico Principal (specs.txt: "Backend do sistema de E-commerce").
+# Interacao com o usuario por meio do terminal: visualizar produtos, realizar
+# pedidos, excluir pedidos e consultar seus pedidos e respectivos status.
+# Exchange eCommerce (tipo direct).
+# Publica:
+#   pedido.criado  - cada novo pedido recebido.
+#   pedido.excluido - quando um produto nao esta disponivel em estoque ou
+#                     quando o pagamento de um pedido e recusado.
+# Consome: pagamento.aprovado, pagamento.recusado, pedido.enviado,
+#   pedido.estoque_ok, estoque.indisponivel (atualiza o status dos pedidos).
+# Fila propria: fila.principal.
 import sys
 import threading
 import uuid

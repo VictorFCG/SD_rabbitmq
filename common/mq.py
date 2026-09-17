@@ -1,3 +1,13 @@
+# Camada de mensageria (RabbitMQ) compartilhada pelos processos.
+# specs.txt: comunicacao exclusivamente por eventos publicados/consumidos no
+# broker, sem chamadas diretas entre processos; routing keys hierarquicas;
+# cada consumidor possui a sua propria fila.
+# Exchanges:
+#   eCommerce (tipo direct) - eventos do fluxo de pedido.
+#   Promocoes (tipo topic)  - promocoes de produtos por categoria.
+# Nao e permitido o uso de exchange fanout.
+# Publica todo evento em um envelope assinado (campo Signature) e o consumidor
+# verifica a assinatura antes de processar (assinatura invalida e descartada).
 import json
 from pathlib import Path
 

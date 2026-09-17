@@ -1,3 +1,8 @@
+# Microsservico Promocoes (specs.txt): geracao e publicacao de promocoes de
+# produtos. Gera promocoes aleatorias e as publica no RabbitMQ com routing keys
+# que indicam a categoria do produto:
+#   promocao.categoria.A, promocao.categoria.B, promocao.categoria.C.
+# Exchange Promocoes (tipo topic). Apenas publica (nao consome eventos).
 import random
 import sys
 import time
