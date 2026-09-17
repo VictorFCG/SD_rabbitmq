@@ -4,6 +4,4 @@ logs/
 .venv/
 venv/
 keys/
-specs.txt
 *.pdf
-questionário.md
