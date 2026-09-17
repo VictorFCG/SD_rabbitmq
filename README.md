@@ -5,6 +5,11 @@ com assinatura/validação digital RSA dos envelopes.
 
 ## Pré-requisitos
 
+Python 3 e Docker com o plugin Compose (`docker compose`).
+
+Dependências Python (em Linux, se o `pip` for bloqueado pelo sistema/PEP 668, use um
+venv: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`):
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -47,7 +52,8 @@ Principal no terminal atual.
 
 ## Execução manual
 
-Abra um terminal para cada processo (nesta ordem):
+Suba o RabbitMQ e gere as chaves (seções acima) e então abra um terminal para cada
+processo (nesta ordem). Use `python3` no lugar de `python` onde for o caso:
 
 ```bash
 python ms_estoque/main.py
