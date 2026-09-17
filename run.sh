@@ -6,7 +6,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-CONTAINER="rabbitmq-ecommerce"
 LOG_DIR="$ROOT/logs"
 
 # --- Python -----------------------------------------------------------------
@@ -23,7 +22,7 @@ if [ -z "$PYTHON" ]; then
 fi
 echo "Python: $PYTHON ($("$PYTHON" --version 2>&1))"
 
-# --- Docker -----------------------------------------------------------------
+# --- Docker / RabbitMQ via docker compose ------------------------------------
 if ! command -v docker >/dev/null 2>&1; then
     echo "Docker nao encontrado. Instale/abra o Docker e tente novamente." >&2
     exit 1
@@ -32,31 +31,14 @@ if ! docker info >/dev/null 2>&1; then
     echo "Docker nao esta em execucao (ou o usuario nao tem permissao)." >&2
     exit 1
 fi
-
-if [ -n "$(docker ps --filter "name=^/${CONTAINER}$" --format '{{.Names}}')" ]; then
-    echo "RabbitMQ ja esta em execucao ($CONTAINER)."
-elif [ -n "$(docker ps -a --filter "name=^/${CONTAINER}$" --format '{{.Names}}')" ]; then
-    echo "Iniciando container $CONTAINER..."
-    docker start "$CONTAINER" >/dev/null
-else
-    echo "Criando container $CONTAINER (pode baixar a imagem na primeira vez)..."
-    docker run -d --name "$CONTAINER" -p 5672:5672 -p 15672:15672 rabbitmq:3-management >/dev/null
-fi
-
-echo "Aguardando o RabbitMQ ficar pronto..."
-deadline=$(( $(date +%s) + 90 ))
-ready=0
-while [ "$(date +%s)" -lt "$deadline" ]; do
-    if docker exec "$CONTAINER" rabbitmq-diagnostics -q ping >/dev/null 2>&1; then
-        ready=1
-        break
-    fi
-    sleep 2
-done
-if [ "$ready" -ne 1 ]; then
-    echo "RabbitMQ nao respondeu a tempo. Verifique o Docker." >&2
+if ! docker compose version >/dev/null 2>&1; then
+    echo "Docker Compose nao encontrado (comando 'docker compose')." >&2
     exit 1
 fi
+
+echo "Subindo o RabbitMQ via docker compose (pode baixar a imagem na primeira vez)..."
+docker compose up -d --wait
+
 echo "RabbitMQ pronto (painel: http://localhost:15672, guest/guest)."
 
 # --- Dependencias e chaves ---------------------------------------------------

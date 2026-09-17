@@ -5,8 +5,6 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location -LiteralPath $Root
 
-$Container = "rabbitmq-ecommerce"
-
 function Test-Python {
     param([string]$Command)
     try {
@@ -30,7 +28,7 @@ function Get-Python {
 $Python = Get-Python
 Write-Host "Python: $Python"
 
-# 1. RabbitMQ via Docker Desktop ---------------------------------------------
+# 1. RabbitMQ via docker compose ---------------------------------------------
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker nao encontrado. Abra o Docker Desktop e tente novamente."
 }
@@ -40,33 +38,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "Docker Desktop nao esta em execucao. Abra-o e rode o script de novo."
 }
 
-$running = docker ps --filter "name=^/$Container$" --format "{{.Names}}" 2>$null
-if ($running) {
-    Write-Host "RabbitMQ ja esta em execucao ($Container)."
-}
-else {
-    $exists = docker ps -a --filter "name=^/$Container$" --format "{{.Names}}" 2>$null
-    if ($exists) {
-        Write-Host "Iniciando container $Container..."
-        docker start $Container 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Falha ao iniciar o container $Container." }
-    }
-    else {
-        Write-Host "Criando container $Container (pode baixar a imagem na primeira vez)..."
-        docker run -d --name $Container -p 5672:5672 -p 15672:15672 rabbitmq:3-management 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o container $Container." }
-    }
+docker compose version *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw "Docker Compose nao encontrado (comando 'docker compose')."
 }
 
-Write-Host "Aguardando o RabbitMQ ficar pronto..."
-$deadline = (Get-Date).AddSeconds(90)
-do {
-    Start-Sleep -Seconds 2
-    docker exec $Container rabbitmq-diagnostics -q ping *> $null
-    $ready = ($LASTEXITCODE -eq 0)
-} until ($ready -or (Get-Date) -gt $deadline)
-
-if (-not $ready) { throw "RabbitMQ nao respondeu a tempo. Verifique o Docker Desktop." }
+Write-Host "Subindo o RabbitMQ via docker compose (pode baixar a imagem na primeira vez)..."
+docker compose up -d --wait 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Falha ao subir o RabbitMQ via docker compose." }
 Write-Host "RabbitMQ pronto (painel: http://localhost:15672, guest/guest)."
 
 # 2. Dependencias e chaves ----------------------------------------------------

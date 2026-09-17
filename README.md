@@ -9,10 +9,10 @@ com assinatura/validação digital RSA dos envelopes.
 pip install -r requirements.txt
 ```
 
-Subir o RabbitMQ (exemplo com Docker):
+O `docker-compose.yml` sobe o RabbitMQ (painel em http://localhost:15672, guest/guest):
 
 ```bash
-docker run -d --name rabbitmq -p 5672:5672 rabbitmq:3
+docker compose up -d
 ```
 
 ## Chaves
@@ -34,6 +34,16 @@ powershell -ExecutionPolicy Bypass -File .\run.ps1
 
 O script sobe o RabbitMQ, instala as dependências, gera as chaves, abre uma janela
 para cada microsserviço/consumidor e inicia o MS Principal no terminal atual.
+
+## Execução automática (Linux / macOS)
+
+```bash
+./run.sh
+```
+
+Sobe o RabbitMQ via `docker compose`, verifica/instala as dependências, gera as chaves,
+roda os microsserviços/consumidores em background (logs em `logs/`) e inicia o MS
+Principal no terminal atual.
 
 ## Execução manual
 
