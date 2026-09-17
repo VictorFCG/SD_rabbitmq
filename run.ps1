@@ -5,15 +5,23 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location -LiteralPath $Root
 
+# Executa um comando nativo com $ErrorActionPreference = "Continue": no Windows
+# PowerShell 5.1, comandos nativos (docker, pip) escrevem status no stderr e o
+# "Stop" os trataria como erro terminante (NativeCommandError). O exit code fica
+# disponivel em $NativeExit.
+function Invoke-Native {
+    param([Parameter(Mandatory)][scriptblock]$Block)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $Block
+    $script:NativeExit = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+}
+
 function Test-Python {
     param([string]$Command)
-    try {
-        & $Command --version *> $null
-        return ($LASTEXITCODE -eq 0)
-    }
-    catch {
-        return $false
-    }
+    Invoke-Native { & $Command --version *> $null }
+    return ($NativeExit -eq 0)
 }
 
 function Get-Python {
@@ -33,29 +41,29 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker nao encontrado. Abra o Docker Desktop e tente novamente."
 }
 
-docker info *> $null
-if ($LASTEXITCODE -ne 0) {
+Invoke-Native { docker info *> $null }
+if ($NativeExit -ne 0) {
     throw "Docker Desktop nao esta em execucao. Abra-o e rode o script de novo."
 }
 
-docker compose version *> $null
-if ($LASTEXITCODE -ne 0) {
+Invoke-Native { docker compose version *> $null }
+if ($NativeExit -ne 0) {
     throw "Docker Compose nao encontrado (comando 'docker compose')."
 }
 
 Write-Host "Subindo o RabbitMQ via docker compose (pode baixar a imagem na primeira vez)..."
-docker compose up -d --wait 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Falha ao subir o RabbitMQ via docker compose." }
+Invoke-Native { docker compose up -d --wait 2>$null }
+if ($NativeExit -ne 0) { throw "Falha ao subir o RabbitMQ via docker compose." }
 Write-Host "RabbitMQ pronto (painel: http://localhost:15672, guest/guest)."
 
 # 2. Dependencias e chaves ----------------------------------------------------
 Write-Host "Instalando dependencias Python..."
-& $Python -m pip install -r requirements.txt 2>&1
-if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar as dependencias (pip)." }
+Invoke-Native { & $Python -m pip install -r requirements.txt 2>&1 }
+if ($NativeExit -ne 0) { throw "Falha ao instalar as dependencias (pip)." }
 
 Write-Host "Gerando/distribuindo chaves..."
-& $Python setup_keys.py 2>&1
-if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar/distribuir as chaves." }
+Invoke-Native { & $Python setup_keys.py 2>&1 }
+if ($NativeExit -ne 0) { throw "Falha ao gerar/distribuir as chaves." }
 
 # 3. Inicia os servicos em janelas separadas ---------------------------------
 $services = @("ms_estoque", "ms_pagamento", "ms_entrega", "ms_promocoes", "consumidor_c1", "consumidor_c2")
