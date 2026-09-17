@@ -1,4 +1,4 @@
-# Microsservico Estoque (specs.txt): gerenciamento do estoque dos produtos.
+# Microsservico Estoque gerenciamento do estoque dos produtos.
 # Exchange eCommerce (tipo direct).
 # Consome: pedido.criado e pedido.excluido.
 # Ao receber pedido.criado verifica a disponibilidade dos produtos:

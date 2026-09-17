@@ -1,9 +1,7 @@
-# Consumidor de Promocoes C1 (specs.txt): recebe apenas notificacoes sobre
-# promocoes de produtos e comunica-se exclusivamente com o RabbitMQ (nao pode
-# realizar chamadas para nenhum dos microsservicos).
+# Consumidor de Promocoes C1 recebe apenas notificacoes sobre
 # Exchange Promocoes (tipo topic).
 # Registra interesse nas categorias A e B, com as routing keys:
-#   promocao.categoria.A e promocao.categoria.B.
+# promocao.categoria.A e promocao.categoria.B.
 # Fila propria: fila.C1.
 import sys
 from pathlib import Path

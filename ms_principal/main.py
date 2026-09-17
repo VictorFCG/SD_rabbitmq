@@ -1,4 +1,4 @@
-# Microsservico Principal (specs.txt: "Backend do sistema de E-commerce").
+# Microsservico Principal "Backend do sistema de E-commerce").
 # Interacao com o usuario por meio do terminal: visualizar produtos, realizar
 # pedidos, excluir pedidos e consultar seus pedidos e respectivos status.
 # Exchange eCommerce (tipo direct).

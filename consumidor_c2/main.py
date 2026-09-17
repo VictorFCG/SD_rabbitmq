@@ -1,6 +1,4 @@
-# Consumidor de Promocoes C2 (specs.txt): recebe apenas notificacoes sobre
-# promocoes de produtos e comunica-se exclusivamente com o RabbitMQ (nao pode
-# realizar chamadas para nenhum dos microsservicos).
+# Consumidor de Promocoes C2 
 # Exchange Promocoes (tipo topic).
 # Registra interesse em todas as categorias, com o padrao de binding:
 #   promocao.categoria.*

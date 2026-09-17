@@ -1,4 +1,4 @@
-# Microsservico Entrega (specs.txt): emissao de notas e entrega dos produtos.
+# Microsservico Entrega emissao de notas e entrega dos produtos.
 # Exchange eCommerce (tipo direct).
 # Consome: pagamento.aprovado.
 # Apos receber, realiza a emissao da nota e a preparacao da entrega e publica

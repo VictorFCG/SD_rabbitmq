@@ -1,4 +1,4 @@
-# Microsservico Pagamento (specs.txt): processamento dos pagamentos dos pedidos.
+# Microsservico Pagamento processamento dos pagamentos dos pedidos.
 # Exchange eCommerce (tipo direct).
 # Consome: pedido.estoque_ok (inicia o processo de pagamento do pedido).
 # O pagamento e simulado com variaveis aleatorias:
