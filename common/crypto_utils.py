@@ -43,6 +43,8 @@ def build_envelope(service, routing_key, data, private_key):
 
 
 def verify_envelope(envelope, key_dir):
+    if not isinstance(envelope, dict):
+        return False
     signature = envelope.get("Signature")
     if not signature:
         return False

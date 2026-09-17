@@ -61,10 +61,16 @@ class Consumer:
             channel.basic_ack(method.delivery_tag)
             return
 
-        if not verify_envelope(envelope, self.key_dir):
+        try:
+            valido = verify_envelope(envelope, self.key_dir)
+        except Exception:  # noqa: BLE001 - envelope malformado nao pode derrubar o consumidor
+            valido = False
+
+        if not valido:
+            origem = envelope.get("service") if isinstance(envelope, dict) else "desconhecido"
             print(
                 f"[{self.service}] assinatura invalida de "
-                f"'{envelope.get('service')}' -> evento descartado"
+                f"'{origem}' -> evento descartado"
             )
             channel.basic_ack(method.delivery_tag)
             return
