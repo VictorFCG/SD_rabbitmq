@@ -1,6 +1,6 @@
 # E-commerce MOM (RabbitMQ)
 
-Ver `PLANEJAMENTO.md` para a arquitetura. Comunicação 100% por eventos (RabbitMQ),
+Comunicação 100% por eventos (RabbitMQ),
 com assinatura/validação digital RSA dos envelopes.
 
 ## Pré-requisitos
