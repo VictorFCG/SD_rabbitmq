@@ -7,10 +7,24 @@ Set-Location -LiteralPath $Root
 
 $Container = "rabbitmq-ecommerce"
 
+function Test-Python {
+    param([string]$Command)
+    try {
+        & $Command --version *> $null
+        return ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+}
+
 function Get-Python {
-    if (Get-Command python -ErrorAction SilentlyContinue) { return "python" }
-    if (Get-Command py -ErrorAction SilentlyContinue) { return "py" }
-    throw "Python nao encontrado no PATH."
+    foreach ($candidate in @("python", "py")) {
+        if ((Get-Command $candidate -ErrorAction SilentlyContinue) -and (Test-Python $candidate)) {
+            return $candidate
+        }
+    }
+    throw "Python nao encontrado ou nao executavel no PATH."
 }
 
 $Python = Get-Python
@@ -26,19 +40,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Docker Desktop nao esta em execucao. Abra-o e rode o script de novo."
 }
 
-$running = docker ps --filter "name=^/$Container$" --format "{{.Names}}"
+$running = docker ps --filter "name=^/$Container$" --format "{{.Names}}" 2>$null
 if ($running) {
     Write-Host "RabbitMQ ja esta em execucao ($Container)."
 }
 else {
-    $exists = docker ps -a --filter "name=^/$Container$" --format "{{.Names}}"
+    $exists = docker ps -a --filter "name=^/$Container$" --format "{{.Names}}" 2>$null
     if ($exists) {
         Write-Host "Iniciando container $Container..."
-        docker start $Container | Out-Null
+        docker start $Container 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Falha ao iniciar o container $Container." }
     }
     else {
         Write-Host "Criando container $Container (pode baixar a imagem na primeira vez)..."
-        docker run -d --name $Container -p 5672:5672 -p 15672:15672 rabbitmq:3-management | Out-Null
+        docker run -d --name $Container -p 5672:5672 -p 15672:15672 rabbitmq:3-management 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o container $Container." }
     }
 }
 
@@ -55,10 +71,12 @@ Write-Host "RabbitMQ pronto (painel: http://localhost:15672, guest/guest)."
 
 # 2. Dependencias e chaves ----------------------------------------------------
 Write-Host "Instalando dependencias Python..."
-& $Python -m pip install -r requirements.txt
+& $Python -m pip install -r requirements.txt 2>&1
+if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar as dependencias (pip)." }
 
 Write-Host "Gerando/distribuindo chaves..."
-& $Python setup_keys.py
+& $Python setup_keys.py 2>&1
+if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar/distribuir as chaves." }
 
 # 3. Inicia os servicos em janelas separadas ---------------------------------
 $services = @("ms_estoque", "ms_pagamento", "ms_entrega", "ms_promocoes", "consumidor_c1", "consumidor_c2")
