@@ -1,0 +1,27 @@
+{
+  "name": "loja-sd-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Frontend web (React + TypeScript) do e-commerce do Trab2 de Sistemas Distribuídos",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.3"
+  }
+}

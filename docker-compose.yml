@@ -1,10 +1,12 @@
+# As portas sao publicadas so em 127.0.0.1: o broker (guest/guest) e a caixa de
+# e-mail nao ficam acessiveis para outras maquinas da rede.
 services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq-ecommerce
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -13,6 +15,17 @@ services:
       timeout: 10s
       retries: 12
       start_period: 20s
+
+  # Caixa de e-mail local com API HTTP (POST /api/v1/send). Usada pelo MS
+  # Promocoes quando nenhuma RESEND_API_KEY e configurada; os e-mails enviados
+  # aparecem em http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    container_name: mailpit-ecommerce
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
 
 volumes:
   rabbitmq-data:
