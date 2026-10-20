@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-// Ícones de traço simples desenhados em SVG inline (sem dependências externas).
 const DESENHOS = {
   carrinho: (
     <>

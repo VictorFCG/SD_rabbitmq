@@ -1,6 +1,3 @@
-// Tela principal depois da identificação: junta catálogo, carrinho, pedidos,
-// promoções, a conexão SSE e os avisos. É remontada a cada troca de usuário
-// (key = e-mail), o que fecha a conexão SSE e zera o estado do cliente anterior.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_URL, ErroApi, cancelarPedido, criarPedido, mensagemDeErro } from "../api";
 import { gravarAba, lerAba } from "../armazenamento";
@@ -23,7 +20,6 @@ import { MeusPedidos } from "./MeusPedidos";
 import { PainelNotificacoes } from "./PainelNotificacoes";
 import { Promocoes } from "./Promocoes";
 
-// Eventos depois dos quais o estoque exibido pode ter mudado (reserva ou devolução).
 const TIPOS_QUE_MUDAM_ESTOQUE = new Set([
   "pedido.estoque_ok",
   "estoque.indisponivel",
@@ -83,8 +79,7 @@ export function Loja({ cliente, aoTrocarUsuario }: Props) {
   };
 
   const aoConectar = () => {
-    // A cada (re)conexão, ressincroniza os pedidos: eventos podem ter sido perdidos.
-    // Numa reconexão (ou se a carga inicial falhou) atualiza também estoque e promoções.
+    // A cada (re)conexão, ressincroniza: eventos podem ter sido perdidos.
     void pedidos.recarregar();
     if (jaConectou.current || catalogo.erro) void catalogo.recarregar();
     if (jaConectou.current || promocoes.erro) void promocoes.recarregar();
@@ -103,7 +98,6 @@ export function Loja({ cliente, aoTrocarUsuario }: Props) {
   }, []);
 
   useEffect(() => {
-    // Ao trocar de aba com a página rolada, volta ao início do conteúdo.
     const conteudo = document.getElementById("conteudo");
     if (conteudo && conteudo.getBoundingClientRect().top < 0) conteudo.scrollIntoView({ block: "start" });
   }, [aba]);
@@ -118,7 +112,7 @@ export function Loja({ cliente, aoTrocarUsuario }: Props) {
   const fecharPainel = useCallback(() => {
     setPainelAberto(false);
     marcarComoLidas();
-    // Sem rolar até o sino: um clique fora fecha o painel e não pode ser perdido.
+    // Sem rolar até o sino, senão o clique fora que fechou o painel se perde.
     refSino.current?.focus({ preventScroll: true });
   }, [marcarComoLidas]);
 
@@ -148,10 +142,10 @@ export function Loja({ cliente, aoTrocarUsuario }: Props) {
     return true;
   };
 
+  // PDF (Frontend 0,5): ao finalizar o pedido, abre uma nova aba com a URL do Mock de Pagamento.
   const finalizarPedido = async () => {
     if (enviandoPedido || carrinho.itens.length === 0) return;
-    // A aba precisa ser aberta aqui, ainda dentro do clique (antes de qualquer await),
-    // para não ser barrada pelo bloqueador de pop-ups.
+    // Antes de qualquer await, senão o bloqueador de pop-ups barra a aba.
     const janela = abasPagamento.abrir();
     const itens = carrinho.itens.map(({ codigo, quantidade }) => ({ codigo, quantidade }));
     setEnviandoPedido(true);

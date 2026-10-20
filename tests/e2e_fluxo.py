@@ -1,12 +1,5 @@
-# Teste ponta a ponta do Trab2. Exige o sistema completo no ar (./run.sh, run.ps1
-# ou execucao manual) e exercita tudo pelo API Gateway, como o frontend faria:
-#   - REST (produtos, pedidos, cancelamento, interesses) e SSE (/api/eventos);
-#   - pedido aprovado ate "Pedido Enviado", pedido recusado (estoque devolvido),
-#     estoque indisponivel, cancelamento com webhook rejeitado;
-#   - clique do usuario na pagina do Mock de Pagamento (POST do formulario);
-#   - evento adulterado (assinatura invalida) descartado pelo gateway;
-#   - reenvio de eventos SSE perdidos (Last-Event-ID);
-#   - inscricao em promocoes e e-mails conferidos no Mailpit.
+# Teste ponta a ponta. Exige o sistema completo no ar (./run.sh, run.ps1 ou
+# execucao manual) e exercita tudo pelo API Gateway, como o frontend faria.
 # Uso (na raiz do projeto):  python tests/e2e_fluxo.py
 # Dica: suba o MS Promocoes com PROMOCAO_INTERVALO=5 para nao esperar 30 s.
 import json
@@ -42,7 +35,6 @@ def checar(nome, condicao, detalhe=""):
 
 
 class ClienteSSE:
-    # Le o stream SSE em uma thread e guarda todos os eventos recebidos.
     def __init__(self, email, ultimo_id=None):
         self.email = email
         self.eventos = []
@@ -246,8 +238,7 @@ def fluxo_cancelado(sse, email, codigo):
         return
     url = pendente["data"]["pedido"]["url_pagamento"]
 
-    # Evento adulterado: assinado pelo MS Pagamento para outro pedido e depois
-    # alterado -> assinatura invalida -> o gateway deve descartar.
+    # Assinado pelo MS Pagamento e depois adulterado: o gateway deve descartar.
     envelope = build_envelope(
         "pagamento", "pagamento.aprovado", {"id_pedido": "PEDFALSO", "id_cobranca": "X", "valor": 1.0},
         load_private(CHAVE_PAGAMENTO),
@@ -308,8 +299,7 @@ def fluxo_promocoes(sse, email):
     checar("MS Promocoes registrou o interesse", categorias == ["A", "B", "C"], categorias)
     checar("e-mail de confirmacao no Mailpit", esperar_email(email, "Inscri"))
 
-    # So valem as promocoes geradas depois da inscricao; o e-mail de cada uma
-    # traz o nome do produto no assunto.
+    # So valem promocoes posteriores a inscricao; o assunto do e-mail traz o produto.
     with sse._lock:
         marca = len(sse.eventos)
     limite = time.time() + max(config.PROMOCAO_INTERVALO * 3 + 10, 25)

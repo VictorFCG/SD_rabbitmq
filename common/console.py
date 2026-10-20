@@ -1,8 +1,5 @@
-# Ajuste do console no Windows. No console classico (conhost) a "Edicao Rapida"
-# (QuickEdit) vem ligada: clicar ou selecionar texto na janela de um servico pausa
-# o processo inteiro ate apertar Esc/Enter (o servico para de responder no meio da
-# apresentacao). Cada processo desliga a Edicao Rapida da propria janela ao iniciar.
-# Fora do Windows, ou sem console (saida redirecionada), nao faz nada.
+# Desliga a Edicao Rapida (QuickEdit) do console do Windows: com ela ligada,
+# clicar na janela de um servico pausa o processo ate apertar Esc/Enter.
 import os
 
 ENABLE_QUICK_EDIT_MODE = 0x0040
@@ -23,5 +20,5 @@ def desativar_edicao_rapida():
         if kernel32.GetConsoleMode(entrada, ctypes.byref(modo)):
             novo = (modo.value & ~ENABLE_QUICK_EDIT_MODE) | ENABLE_EXTENDED_FLAGS
             kernel32.SetConsoleMode(entrada, novo)
-    except Exception:  # noqa: BLE001 - ajuste opcional, nunca impede o servico de subir
+    except Exception:  # noqa: BLE001 - ajuste opcional
         pass

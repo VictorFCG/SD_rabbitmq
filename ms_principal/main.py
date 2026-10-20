@@ -1,18 +1,9 @@
-# Microsservico Principal = API Gateway do sistema de E-commerce (Trab2).
-# Ponto de entrada do frontend web: expoe a API REST (FastAPI, Swagger em /docs)
-# e mantem as conexoes SSE (/api/eventos) pelas quais cada cliente recebe em
-# tempo real toda mudanca de status dos SEUS pedidos (e as promocoes).
-# Traduz as acoes do usuario em eventos assinados no RabbitMQ:
-#   Exchange eCommerce (direct) - publica pedido.criado e pedido.excluido
-#     (cancelamento pelo cliente, estoque indisponivel ou pagamento recusado).
-#   Exchange Promocoes (topic) - publica interesse.promocao (INSCREVER/CANCELAR).
-# Consome (fila propria fila.principal):
-#   eCommerce: pedido.estoque_ok, estoque.indisponivel, pagamento.pendente,
-#     pagamento.aprovado, pagamento.recusado, pedido.enviado -> atualiza o
-#     status do pedido e notifica o dono do pedido via SSE;
-#   Promocoes: promocao.categoria.* -> repassa as promocoes via SSE.
-# Consulta via REST o MS Estoque (lista de produtos) e o MS Promocoes
-# (interesses cadastrados e promocoes recentes).
+# Microsservico Principal (API Gateway): API REST do frontend e notificacoes
+# em tempo real via SSE (/api/eventos). Exchanges eCommerce e Promocoes.
+# Publica: pedido.criado, pedido.excluido e interesse.promocao.
+# Consome: pedido.estoque_ok, estoque.indisponivel, pagamento.pendente,
+#   pagamento.aprovado, pagamento.recusado, pedido.enviado e promocao.categoria.*
+# Fila propria: fila.principal.
 import asyncio
 import re
 import sys
@@ -59,6 +50,7 @@ KEYS = Path(__file__).resolve().parent / "keys"
 DADOS = Path(__file__).resolve().parent / "data"
 
 FILA = "fila.principal"
+# PDF (Gateway): consome os eventos de Estoque, Pagamento e Entrega.
 BINDINGS = [
     (EXCHANGE_ECOMMERCE, "pedido.estoque_ok"),
     (EXCHANGE_ECOMMERCE, "estoque.indisponivel"),
@@ -77,17 +69,13 @@ FALHA_MENSAGERIA = "serviço de mensageria indisponível. Tente novamente em ins
 publisher = None
 db = None
 hub = HubNotificacoes()
-transporte_http = None  # None = rede real; os testes trocam por httpx.MockTransport
-# Serializa as mudancas de status com as notificacoes SSE correspondentes: o
-# navegador recebe os eventos de um pedido na mesma ordem em que o status mudou.
+transporte_http = None  # os testes trocam por httpx.MockTransport
+# Mantem as notificacoes SSE na mesma ordem das mudancas de status.
 trava_pedidos = threading.Lock()
 
 
 def log(mensagem):
     print(f"[principal] {mensagem}".encode("ascii", "backslashreplace").decode("ascii"), flush=True)
-
-
-# --- Validacao das entradas -----------------------------------------------------
 
 
 def validar_email(valor):
@@ -193,9 +181,6 @@ def traduzir_erro(erro):
         return mensagem
 
 
-# --- Ciclo de vida e aplicacao ---------------------------------------------------
-
-
 @asynccontextmanager
 async def ciclo_de_vida(_app):
     global publisher, db
@@ -237,9 +222,6 @@ async def erro_de_validacao(_request, exc):
     return JSONResponse(status_code=422, content={"detail": detalhes})
 
 
-# --- Apoio: REST para os outros servicos, publicacao e SSE ---------------------
-
-
 def consultar(url, servico, params=None):
     # trust_env=False: no Windows o httpx usaria o proxy do sistema ate para 127.0.0.1.
     try:
@@ -252,6 +234,7 @@ def consultar(url, servico, params=None):
         raise HTTPException(status_code=503, detail=f"{servico} indisponível") from exc
 
 
+# PDF (0,1): publica pedido.criado, pedido.excluido e interesse.promocao.
 def publicar(exchange, routing_key, dados, falha):
     try:
         publisher.publish(exchange, routing_key, dados)
@@ -260,6 +243,7 @@ def publicar(exchange, routing_key, dados, falha):
         raise HTTPException(status_code=503, detail=f"{falha}: {FALHA_MENSAGERIA}") from exc
 
 
+# PDF (0,5): notificacao SSE de cada mudanca de status ao dono do pedido.
 def notificar(pedido, tipo, mensagem):
     hub.enviar(
         pedido["email"],
@@ -284,9 +268,7 @@ def evento_sse(item):
     return ServerSentEvent(event=item["evento"], id=str(item["id"]), data=item["dados"])
 
 
-# --- API REST -----------------------------------------------------------------
-
-
+# PDF (0,1): lista os produtos disponiveis, consultando o MS Estoque via REST.
 @app.get("/api/produtos", tags=["Produtos"], summary="Lista os produtos (consulta o MS Estoque)")
 def listar_produtos(incluir_esgotados: bool = False):
     return consultar(
@@ -301,6 +283,7 @@ def listar_categorias():
     return [{"codigo": codigo, "nome": nome} for codigo, nome in CATEGORIAS.items()]
 
 
+# PDF (0,1): cria pedidos.
 @app.post("/api/pedidos", status_code=201, tags=["Pedidos"], summary="Cria um pedido")
 def criar_pedido(novo: NovoPedido):
     itens = [item.model_dump() for item in novo.itens]
@@ -367,6 +350,7 @@ def cancelar_pedido(id_pedido: Annotated[str, PathParam(max_length=40)]):
     return cancelado
 
 
+# PDF (0,1): registra interesse (e-mail) em promocoes de categorias.
 @app.post("/api/interesses", status_code=202, tags=["Promoções"], summary="Registra interesse em promoções")
 def registrar_interesse(interesse: NovoInteresse):
     publicar(
@@ -389,8 +373,8 @@ def registrar_interesse(interesse: NovoInteresse):
     }
 
 
-# {email:path}: "/" e valido na parte local do e-mail e o Starlette decodifica %2F
-# antes de rotear; barra no dominio (segmento extra, barra final) cai na validacao.
+# PDF (0,1): cancela o interesse em receber e-mail de promocoes.
+# {email:path}: "/" e valido na parte local do e-mail.
 @app.delete(
     "/api/interesses/{email:path}",
     status_code=202,
@@ -438,6 +422,7 @@ def saude():
     return {"servico": "principal", "status": "ok", "conexoes_sse": hub.conexoes()}
 
 
+# PDF (0,5): conexao SSE com o frontend.
 @app.get(
     "/api/eventos",
     response_class=EventSourceResponse,
@@ -467,7 +452,7 @@ async def eventos(
         while True:
             item = await fila.get()
             if item is None:
-                return  # gateway desligando; o navegador reconecta sozinho depois
+                return  # gateway desligando
             if item["id"] <= enviado:
                 continue
             yield evento_sse(item)
@@ -475,9 +460,6 @@ async def eventos(
     finally:
         hub.cancelar(email, fila)
         log(f"SSE desconectado: {email}")
-
-
-# --- Eventos consumidos do RabbitMQ (thread do consumidor) -----------------------
 
 
 def sem_nulos(**campos):
@@ -506,9 +488,7 @@ def aplicar(id_pedido, tipo, novo_status, mensagem, **campos):
 
 
 def excluir_pedido(id_pedido, motivo):
-    # Chamado sempre que o pedido esta no status final do evento, tambem na
-    # reentrega: se a publicacao anterior falhou (RabbitMQ fora do ar), so assim
-    # o MS Estoque devolve a reserva. Repetir o pedido.excluido e inofensivo.
+    # Tambem roda na reentrega, caso a publicacao anterior tenha falhado.
     try:
         publisher.publish(
             EXCHANGE_ECOMMERCE, "pedido.excluido", {"id_pedido": id_pedido, "motivo": motivo}
@@ -636,8 +616,7 @@ def tratar_evento(routing_key, dados):
 
 
 class Servidor(uvicorn.Server):
-    # Ctrl+C: alem de parar o uvicorn, termina os streams SSE abertos (que nunca
-    # terminam sozinhos); timeout_graceful_shutdown fica como garantia.
+    # No Ctrl+C encerra tambem os streams SSE abertos, que nao terminam sozinhos.
     def handle_exit(self, sig, frame):
         hub.encerrar()
         super().handle_exit(sig, frame)

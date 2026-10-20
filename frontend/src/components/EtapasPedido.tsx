@@ -11,8 +11,7 @@ const DESCRICAO: Record<EstadoEtapa, string> = {
 
 export function EtapasPedido({ pedido }: { pedido: Pedido }) {
   const etapas = etapasDoPedido(pedido);
-  // Em telas estreitas os rótulos não cabem sob cada marcador: a legenda mostra só a
-  // etapa em destaque (falha, atual ou a última concluída).
+  // Em telas estreitas os rótulos não cabem: a legenda mostra só a etapa em destaque.
   let indice = etapas.findIndex((etapa) => etapa.estado === "falha" || etapa.estado === "atual");
   if (indice < 0) indice = etapas.map((etapa) => etapa.estado).lastIndexOf("concluida");
   const destaque = indice >= 0 ? etapas[indice] : null;

@@ -1,5 +1,3 @@
-// Promoções recentes: carga inicial via REST (GET /api/promocoes/recentes, que o
-// gateway busca no MS Promoções) + novas promoções recebidas pelo SSE.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ehIndisponibilidade, listarPromocoesRecentes, mensagemDeErro } from "../api";
 import { paraMs } from "../formatar";
@@ -14,12 +12,10 @@ export interface ErroPromocoes {
 
 export interface EstadoPromocoes {
   promocoes: Promocao[];
-  /** Ids das promoções que chegaram pelo SSE nesta sessão. */
   aoVivo: ReadonlySet<string>;
   carregando: boolean;
   erro: ErroPromocoes | null;
   recarregar: () => Promise<void>;
-  /** Acrescenta uma promoção; retorna false se ela já era conhecida. */
   adicionar: (promocao: Promocao) => boolean;
 }
 

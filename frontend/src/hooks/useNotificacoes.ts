@@ -1,4 +1,3 @@
-// Histórico das notificações recebidas via SSE (painel "Notificações").
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Tom } from "../tipos";
 
@@ -9,7 +8,6 @@ export interface Notificacao {
   tom: Tom;
   titulo: string;
   mensagem: string;
-  /** Instante do evento (ISO); usa o horário de chegada se o evento não trouxer. */
   momento: string;
 }
 

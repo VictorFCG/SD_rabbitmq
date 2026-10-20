@@ -1,7 +1,5 @@
-# Testes unitarios do MS Promocoes: repositorio de interesses (SQLite), API de
-# e-mail (Resend/Mailpit/console via httpx.MockTransport), tratamento do evento
-# interesse.promocao, gerador de promocoes e endpoints REST.
-# Nao dependem de RabbitMQ, Docker nem de outros processos.
+# Testes do MS Promocoes (sem RabbitMQ): interesses em SQLite, envio de e-mail
+# via httpx.MockTransport, gerador de promocoes e REST.
 import json
 import re
 import threading
@@ -85,7 +83,6 @@ def servico(monkeypatch, db, emails):
     return publisher
 
 
-# --- Repositorio de interesses ------------------------------------------------
 def test_db_inscrever_normaliza_email_e_soma_categorias(db):
     assert db.inscrever(" Ana@Exemplo.COM ", "Ana", ["B", "A"]) == ["A", "B"]
     assert db.inscrever("ana@exemplo.com", None, ["C", "A"]) == ["A", "B", "C"]
@@ -141,7 +138,6 @@ def test_db_suporta_varias_threads(db):
     assert len(db.interessados("B")) == 160
 
 
-# --- API de e-mail ------------------------------------------------------------
 def responder(status, corpo=None, cabecalhos=None):
     return lambda: httpx.Response(status, json=corpo, headers=cabecalhos)
 
@@ -332,7 +328,6 @@ def test_texto_ascii_remove_acentos():
     assert email_api.texto_ascii("Promoção Periféricos Acessórios") == "Promocao Perifericos Acessorios"
 
 
-# --- interesse.promocao -------------------------------------------------------
 def test_importar_o_main_nao_tem_efeitos_colaterais():
     assert promocoes.publisher is None
     assert promocoes.db is None
@@ -470,7 +465,6 @@ def test_confirmacao_pelo_provedor_console(monkeypatch, db, capsys):
     assert saida.isascii()
 
 
-# --- Gerador de promocoes -----------------------------------------------------
 def test_gerar_promocao_publica_e_avisa_os_inscritos(servico, db, emails, monkeypatch, capsys):
     monkeypatch.setattr(promocoes, "PRODUTOS", TECLADO)
     monkeypatch.setattr(promocoes, "DESCONTOS", [20])
@@ -614,7 +608,6 @@ def test_formatar_reais(valor, esperado):
     assert promocoes.formatar_reais(valor) == esperado
 
 
-# --- REST ---------------------------------------------------------------------
 def test_rest_interesses_normaliza_o_email(servico, db):
     cliente = TestClient(promocoes.app)
     db.inscrever("ana@exemplo.com", "Ana", ["C", "A"])

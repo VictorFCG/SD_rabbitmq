@@ -19,8 +19,7 @@ type EstadoInscricao =
   | { tipo: "ok"; email: string; categorias: string[]; confirmando: boolean }
   | { tipo: "erro"; mensagem: string; indisponivel: boolean };
 
-// A inscrição é processada de forma assíncrona (gateway -> RabbitMQ -> MS Promoções),
-// então a consulta de confirmação espera um pouco e tenta de novo se ainda não refletir.
+// A inscrição é processada de forma assíncrona (RabbitMQ): a confirmação espera e tenta de novo.
 const ESPERA_CONFIRMACAO_MS = 700;
 const TENTATIVAS_CONFIRMACAO = 4;
 const ESPERA_DIGITACAO_MS = 400;
@@ -38,10 +37,10 @@ interface Props {
   cliente: Cliente;
   promocoes: EstadoPromocoes;
   mostrarToast: MostrarToast;
-  /** Conexão SSE ativa: ao (re)conectar, refaz as consultas que tinham falhado. */
   conectado: boolean;
 }
 
+// PDF (Frontend 0,5): inscrição do e-mail e das categorias de interesse nas promoções.
 export function Promocoes({ cliente, promocoes, mostrarToast, conectado }: Props) {
   const ids = useId();
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
@@ -79,7 +78,6 @@ export function Promocoes({ cliente, promocoes, mostrarToast, conectado }: Props
     void carregarCategorias();
   }, [carregarCategorias]);
 
-  /** Consulta a inscrição; com `esperado`, repete até o MS Promoções refletir a mudança. */
   const consultar = useCallback(async (alvo: string, esperado: string[] | null, aguardar: boolean) => {
     const minha = ++consulta.current;
     const tentativas = esperado ? TENTATIVAS_CONFIRMACAO : 1;
@@ -173,7 +171,7 @@ export function Promocoes({ cliente, promocoes, mostrarToast, conectado }: Props
         ),
         "Preferências enviadas",
       );
-      // Sem a inscrição atual conhecida, o resultado final (atuais + novas) não é previsível.
+      // Sem a inscrição atual conhecida, não dá para prever o resultado final.
       setInscricao({ tipo: "ok", email: emailNormalizado, categorias: atuais ? escolhidas : adicionadas, confirmando: true });
       void consultar(emailNormalizado, atuais ? escolhidas : null, true);
     } catch (falha) {
@@ -420,7 +418,6 @@ export function Promocoes({ cliente, promocoes, mostrarToast, conectado }: Props
 interface PropsCartaoPromocao {
   promocao: Promocao;
   doInteresse: boolean;
-  /** Recebida pelo SSE (e não na carga inicial): ganha a animação de destaque. */
   aoVivo: boolean;
 }
 

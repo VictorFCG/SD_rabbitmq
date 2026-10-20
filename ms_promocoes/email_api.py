@@ -1,13 +1,8 @@
-# Integracao do MS Promocoes com a API externa de e-mail.
-# Provedores (EMAIL_PROVIDER no .env; vazio = automatico):
-#   resend  - API REST do Resend (POST https://api.resend.com/emails, token Bearer).
-#             As chamadas sao espacadas (limite de requisicoes por segundo da API)
-#             e a resposta 429 e repetida apos o tempo pedido (Retry-After).
-#   mailpit - caixa de e-mail local do docker compose (POST /api/v1/send); usado
-#             automaticamente quando nao ha RESEND_API_KEY.
+# Envio de e-mails do MS Promocoes pela API externa (EMAIL_PROVIDER no .env):
+#   resend  - API REST do Resend (requer RESEND_API_KEY);
+#   mailpit - caixa de e-mail local do docker compose (padrao sem RESEND_API_KEY);
 #   console - apenas imprime o e-mail no terminal.
-# enviar_email nunca lanca excecao: devolve (ok, detalhe), onde detalhe e o id da
-# mensagem no provedor ou a mensagem de erro.
+# enviar_email nunca lanca excecao: devolve (ok, detalhe).
 import math
 import threading
 import time
@@ -22,20 +17,19 @@ PROVEDORES = ("resend", "mailpit", "console")
 URL_RESEND = "https://api.resend.com/emails"
 USER_AGENT = "trab2-sd-ecommerce/1.0"
 TIMEOUT = 10.0
-INTERVALO_RESEND = 0.6  # segundos entre chamadas ao Resend (folga sobre o limite da API)
+INTERVALO_RESEND = 0.6  # segundos entre chamadas (limite de requisicoes da API)
 TENTATIVAS_429 = 2
 ESPERA_MAXIMA_429 = 10.0
 ERROS_DE_COTA = ("daily_quota_exceeded", "monthly_quota_exceeded")
 
-# Transporte dos clientes httpx (None = rede; os testes usam httpx.MockTransport).
-transporte = None
+transporte = None  # os testes trocam por httpx.MockTransport
 
 _lock_resend = threading.Lock()
 _ultima_chamada_resend = float("-inf")
 
 
 def texto_ascii(texto):
-    # Remove acentos e qualquer caractere nao ASCII (logs no console do Windows).
+    # Logs sem acentos (console do Windows).
     normalizado = unicodedata.normalize("NFKD", str(texto))
     return normalizado.encode("ascii", "ignore").decode("ascii")
 
@@ -75,8 +69,7 @@ def _aguardar_vez_resend():
 
 
 def _cliente(trust_env=True):
-    # Mailpit e local: trust_env=False evita que o proxy do sistema (Windows) o
-    # intercepte; o Resend mantem o proxy do ambiente para sair para a internet.
+    # trust_env=False no Mailpit (local) para nao passar pelo proxy do sistema.
     return httpx.Client(timeout=TIMEOUT, transport=transporte, trust_env=trust_env)
 
 

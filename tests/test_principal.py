@@ -1,8 +1,6 @@
-# Testes unitarios do MS Principal (API Gateway): repositorio de pedidos (SQLite),
-# hub de notificacoes SSE, gerador SSE, endpoints REST e tratamento dos eventos
-# consumidos do RabbitMQ. Nao usam RabbitMQ, Docker nem outros processos:
-# publisher falso, banco em tmp_path e httpx.MockTransport no lugar do MS
-# Estoque/MS Promocoes. O ciclo de vida (lifespan) do FastAPI nao e executado.
+# Testes do MS Principal (API Gateway) sem RabbitMQ: publisher falso, SQLite em
+# tmp_path e httpx.MockTransport no lugar do MS Estoque/MS Promocoes. O lifespan
+# do FastAPI nao e executado.
 import asyncio
 import signal
 import sys
@@ -143,9 +141,6 @@ async def proximo(gerador, timeout=2):
     return await asyncio.wait_for(gerador.__anext__(), timeout)
 
 
-# --- PedidosDB ----------------------------------------------------------------------
-
-
 def test_db_cria_pedido_no_formato_do_contrato(db):
     pedido = db.criar(EMAIL, "Ana", [{"codigo": "B1", "quantidade": 2}])
     assert pedido["id_pedido"].startswith("PED") and len(pedido["id_pedido"]) == 11
@@ -270,9 +265,6 @@ def test_db_transicao_atomica_entre_threads(db):
     assert len(db.obter(pedido["id_pedido"])["historico"]) == 2
 
 
-# --- HubNotificacoes ------------------------------------------------------------------
-
-
 def test_hub_entrega_evento_enviado_de_outra_thread():
     hub = notificacoes.HubNotificacoes()
 
@@ -365,9 +357,6 @@ def test_hub_com_loop_encerrado_nao_quebra_quem_envia():
     assert hub.pendentes(EMAIL, 0) == [item]
 
 
-# --- Gerador SSE (/api/eventos) ---------------------------------------------------------
-
-
 def test_sse_envia_conectado_e_eventos_ao_vivo(gateway):
     hub = gateway.hub
 
@@ -453,8 +442,7 @@ def test_sse_sem_ultimo_id_nao_reenvia_e_id_futuro_reenvia_tudo(gateway):
         assert (await proximo(gerador)).id == str(novo["id"])
         await gerador.aclose()
 
-        # Last-Event-ID maior que qualquer id desta execucao (veio de uma execucao
-        # anterior do gateway): reenvia todo o buffer em vez de ignorar eventos novos.
+        # Id de uma execucao anterior do gateway (maior que todos): reenvia o buffer.
         futuro = str(hub.ultimo_id() + 10_000)
         gerador = principal.eventos(email=EMAIL, last_event_id=futuro, ultimo_id=None)
         await proximo(gerador)
@@ -503,9 +491,6 @@ def test_sse_email_invalido_responde_422_antes_do_stream(gateway):
         assert resposta.status_code == 422
         assert resposta.headers["content-type"].startswith("application/json")
     assert gateway.hub.conexoes() == 0
-
-
-# --- REST: pedidos ----------------------------------------------------------------------
 
 
 def test_criar_pedido_publica_e_notifica(gateway):
@@ -657,9 +642,6 @@ def test_cancelar_pedido_inexistente_ou_com_rabbitmq_fora(gateway):
     assert len(notificacoes_sse(gateway.hub)) == 1
 
 
-# --- REST: interesses em promocoes --------------------------------------------------------
-
-
 def test_registrar_interesse_publica_inscrever(gateway):
     resposta = gateway.client.post(
         "/api/interesses", json={"email": " Ana@Exemplo.com", "nome": " Ana ", "categorias": ["b", "A", "B"]}
@@ -713,9 +695,6 @@ def test_interesse_com_rabbitmq_fora_responde_503(gateway):
     gateway.pub.falhar = True
     assert gateway.client.post("/api/interesses", json={"email": EMAIL, "categorias": ["A"]}).status_code == 503
     assert gateway.client.delete(f"/api/interesses/{EMAIL}").status_code == 503
-
-
-# --- REST: consultas ao MS Estoque e ao MS Promocoes ----------------------------------------
 
 
 @pytest.fixture
@@ -834,9 +813,6 @@ def test_categorias_saude_e_cors(gateway):
     assert resposta.headers["access-control-allow-origin"] == origem
 
 
-# --- Eventos consumidos do RabbitMQ --------------------------------------------------------
-
-
 def test_fluxo_aprovado_atualiza_status_e_notifica_o_dono(gateway):
     id_pedido = criar_pedido(gateway)["id_pedido"]
     criar_pedido(gateway, email="bia@exemplo.com")
@@ -876,8 +852,6 @@ def test_fluxo_aprovado_atualiza_status_e_notifica_o_dono(gateway):
 
 
 def test_estoque_indisponivel_republica_excluido_na_reentrega(gateway):
-    # A publicacao do pedido.excluido falha (RabbitMQ fora do ar) e o broker
-    # reentrega o evento: a compensacao sai na reentrega e o pedido nao muda.
     id_pedido = criar_pedido(gateway)["id_pedido"]
     dados = dados_evento("estoque.indisponivel", id_pedido)
     gateway.pub.falhar = True
@@ -995,8 +969,7 @@ def test_eventos_desconhecidos_ou_malformados_sao_ignorados(gateway):
 
 
 def test_eventos_sse_de_um_pedido_saem_na_ordem_dos_status(gateway, monkeypatch):
-    # O MS Estoque responde (na thread do consumidor) enquanto a requisicao que
-    # criou o pedido ainda nao terminou: a notificacao de criacao deve sair antes.
+    # estoque_ok chega antes de o POST terminar; a notificacao de criacao sai antes.
     consumidores = []
 
     class PublicadorComEstoqueRapido(PublicadorFalso):

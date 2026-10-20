@@ -15,14 +15,12 @@ LOG_DIR="$ROOT/logs"
 FRONTEND_DIR="$ROOT/frontend"
 VENV_PYTHON="$ROOT/.venv/bin/python"
 PY_MODULES="pika, Crypto, fastapi.sse, uvicorn, httpx"
-# Processos Python, na ordem de inicializacao (o API Gateway por ultimo).
 SERVICES=(ms_estoque ms_pagamento ms_entrega ms_promocoes mock_pagamento ms_principal)
 BACKEND_PORTS=(8001 8002 8003 8004 8005)
 FRONTEND_PORT=5173
 GATEWAY_HEALTH_URL="http://127.0.0.1:8001/api/saude"
 STORE_URL="http://localhost:5173"
 
-# --- Python >= 3.10 -----------------------------------------------------------
 python_ok() {
     "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1
 }
@@ -31,7 +29,6 @@ has_deps() {
     "$1" -c "import $PY_MODULES" >/dev/null 2>&1
 }
 
-# Prefere o .venv do projeto quando ele ja tem as dependencias.
 PYTHON=""
 too_old=""
 if [ -x "$VENV_PYTHON" ] && python_ok "$VENV_PYTHON" && has_deps "$VENV_PYTHON"; then
@@ -56,7 +53,6 @@ if [ -z "$PYTHON" ]; then
 fi
 echo "Python: $PYTHON ($("$PYTHON" --version 2>&1))"
 
-# --- Docker / RabbitMQ e Mailpit via docker compose ---------------------------
 if ! command -v docker >/dev/null 2>&1; then
     echo "Docker nao encontrado. Instale/abra o Docker e tente novamente." >&2
     exit 1
@@ -70,7 +66,6 @@ if ! docker compose version >/dev/null 2>&1; then
     exit 1
 fi
 
-# --- Arquivos dos servicos e portas livres ------------------------------------
 for s in "${SERVICES[@]}"; do
     if [ ! -f "$s/main.py" ]; then
         echo "Arquivo $s/main.py nao encontrado." >&2
@@ -103,8 +98,6 @@ fi
 echo "RabbitMQ pronto (painel: http://localhost:15672, guest/guest)."
 echo "Mailpit pronto (e-mails: http://localhost:8025)."
 
-# --- Dependencias e chaves ---------------------------------------------------
-# Cria (ou recria, se estiver incompleto) o .venv do projeto e instala nele.
 install_in_venv() {
     if ! { python_ok "$VENV_PYTHON" && "$VENV_PYTHON" -m pip --version >/dev/null 2>&1; }; then
         "$PYTHON" -m venv --clear "$ROOT/.venv" || return 1
@@ -144,11 +137,9 @@ if ! "$PYTHON" setup_keys.py; then
     exit 1
 fi
 
-# --- Servicos em background --------------------------------------------------
 mkdir -p "$LOG_DIR"
 PIDS=()
 
-# PIDs dos servicos que ainda estao em execucao.
 alive_pids() {
     local pid
     for pid in "${PIDS[@]:-}"; do
@@ -158,8 +149,7 @@ alive_pids() {
     done
 }
 
-# Encerra os servicos: SIGTERM, depois SIGINT (o uvicorn so deixa de esperar as
-# conexoes SSE abertas no segundo Ctrl+C) e, por ultimo, SIGKILL.
+# INT apos o TERM: o uvicorn so larga as conexoes SSE abertas no segundo sinal.
 cleanup() {
     set +e
     trap '' INT TERM HUP
@@ -192,7 +182,6 @@ for s in "${SERVICES[@]}"; do
 done
 GATEWAY_PID="$!"  # ms_principal e o ultimo da lista
 
-# --- Aguarda o API Gateway ---------------------------------------------------
 gateway_responds() {
     if command -v curl >/dev/null 2>&1; then
         curl -fsS --noproxy '*' -m 2 -o /dev/null "$GATEWAY_HEALTH_URL" >/dev/null 2>&1
@@ -227,7 +216,6 @@ for s in "${SERVICES[@]}"; do
     i=$((i + 1))
 done
 
-# --- Frontend (React + Vite) -------------------------------------------------
 # Vite 8 requer Node.js ^20.19 ou >= 22.12.
 node_version_ok() {
     local version major minor
@@ -245,8 +233,7 @@ node_version_ok() {
     return 1
 }
 
-# npm install quando node_modules nao existe, ficou incompleto ou o package.json
-# mudou depois da ultima instalacao (o npm grava node_modules/.package-lock.json).
+# O npm grava node_modules/.package-lock.json a cada install; sem ele, -nt da true.
 frontend_needs_install() {
     [ "$FRONTEND_DIR/package.json" -nt "$FRONTEND_DIR/node_modules/.package-lock.json" ]
 }
@@ -270,7 +257,6 @@ else
     fi
 fi
 
-# --- Resumo ------------------------------------------------------------------
 store_note=""
 if [ -n "$frontend_problem" ]; then
     store_note=" (nao iniciado: $frontend_problem)"
@@ -291,7 +277,6 @@ echo "==========================================================================
 echo "Ctrl+C encerra tudo o que este script iniciou (servicos e frontend). RabbitMQ"
 echo "e Mailpit continuam no Docker (encerre-os com: docker compose stop)."
 
-# --- Frontend no terminal atual ----------------------------------------------
 if [ -z "$frontend_problem" ]; then
     echo "Iniciando o frontend (npm run dev)..."
     status=0

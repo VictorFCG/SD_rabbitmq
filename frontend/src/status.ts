@@ -11,7 +11,6 @@ export const ROTULOS_STATUS: Record<StatusPedido, string> = {
   CANCELADO: "Pedido Cancelado",
 };
 
-/** Caminho feliz exibido no indicador de etapas de cada pedido. */
 export const FLUXO_PRINCIPAL: readonly StatusPedido[] = [
   "CRIADO",
   "ESTOQUE_CONFIRMADO",
@@ -51,7 +50,6 @@ export function ehAtivo(status: string): boolean {
   return STATUS_ATIVOS.has(status);
 }
 
-/** Cor do selo de status. */
 export function tomDoStatus(status: string): Tom {
   switch (status) {
     case "CRIADO":
@@ -68,7 +66,6 @@ export function tomDoStatus(status: string): Tom {
   }
 }
 
-/** Cor do aviso (toast) de uma mudança de status recebida via SSE. */
 export function tomDaNotificacao(status: string): Tom {
   if (STATUS_SUCESSO.has(status)) return "sucesso";
   if (status === "ESTOQUE_INDISPONIVEL" || status === "PAGAMENTO_RECUSADO") return "erro";
@@ -89,7 +86,6 @@ function posicaoDaFalha(status: string, ultimaAlcancada: number): number {
   return Math.min(ultimaAlcancada + 1, FLUXO_PRINCIPAL.length - 1);
 }
 
-/** Etapas do caminho feliz; em uma falha, a etapa em que o pedido parou fica em vermelho. */
 export function etapasDoPedido(pedido: Pedido): Etapa[] {
   const alcancados = new Set<string>(pedido.historico.map((entrada) => entrada.status));
   alcancados.add(pedido.status);

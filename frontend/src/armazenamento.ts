@@ -18,17 +18,13 @@ export function lerJSON(chave: string): unknown {
 export function gravarJSON(chave: string, valor: unknown): void {
   try {
     window.localStorage.setItem(chave, JSON.stringify(valor));
-  } catch {
-    // Sem armazenamento local: a interface continua funcionando sem persistir.
-  }
+  } catch {}
 }
 
 export function remover(chave: string): void {
   try {
     window.localStorage.removeItem(chave);
-  } catch {
-    // idem
-  }
+  } catch {}
 }
 
 export function lerCliente(): Cliente | null {

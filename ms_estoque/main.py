@@ -1,18 +1,8 @@
-# Microsservico Estoque gerenciamento do estoque dos produtos.
-# Exchange eCommerce (tipo direct).
-# Consome: pedido.criado e pedido.excluido.
-# Ao receber pedido.criado verifica a disponibilidade dos produtos:
-#   - todos disponiveis -> realiza a reserva/baixa e publica pedido.estoque_ok
-#     (itens com nome, categoria, preco unitario e subtotal + valor total);
-#   - algum indisponivel -> nada e reservado e publica estoque.indisponivel.
-# Ao receber pedido.excluido devolve ao estoque os produtos que haviam sido
-# reservados para o pedido.
-# Fila propria: fila.estoque.
-# Trab2: o MS Estoque e o dono dos dados dos produtos. Persiste produtos e
-# reservas em SQLite (data/estoque.db) e expoe via REST a consulta de produtos
-# usada pelo API Gateway (MS Principal):
-#   GET /produtos?disponiveis=true|false, GET /produtos/{codigo}, GET /saude.
-# O consumidor do RabbitMQ roda em uma thread e o servidor HTTP na principal.
+# Microsservico Estoque: dono dos dados dos produtos (SQLite em data/estoque.db).
+# Exchange eCommerce (tipo direct). Fila propria: fila.estoque.
+# Consome: pedido.criado (reserva os itens) e pedido.excluido (devolve a reserva).
+# Publica: pedido.estoque_ok ou estoque.indisponivel.
+# REST para o API Gateway: GET /produtos, GET /produtos/{codigo} e GET /saude.
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -50,8 +40,7 @@ def publicar(routing_key, data):
     try:
         publisher.publish(EXCHANGE_ECOMMERCE, routing_key, data)
     except (AMQPError, OSError) as exc:
-        # A reserva e mantida: se o evento for reentregue a reserva idempotente
-        # publica de novo; se o pedido for excluido o estoque e devolvido.
+        # Mantem a reserva (idempotente); se o pedido for excluido o estoque volta.
         log(f"falha ao publicar {routing_key} do pedido {data['id_pedido']} ({exc.__class__.__name__})")
 
 
@@ -105,7 +94,6 @@ def handle(routing_key, data):
         excluir_pedido(data)
 
 
-# --- API REST (consultada pelo API Gateway) -----------------------------------
 app = FastAPI(
     title="MS Estoque",
     description="Consulta dos produtos e das quantidades em estoque (usada pelo API Gateway).",
@@ -123,6 +111,7 @@ class Produto(BaseModel):
     disponivel: bool
 
 
+# PDF (0,1): endpoint para o API Gateway consultar os produtos disponiveis.
 @app.get("/produtos", response_model=list[Produto], summary="Lista os produtos do estoque")
 def listar_produtos(
     disponiveis: Annotated[

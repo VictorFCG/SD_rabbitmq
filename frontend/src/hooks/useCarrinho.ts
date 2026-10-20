@@ -1,4 +1,3 @@
-// Carrinho do cliente, salvo no localStorage por e-mail.
 import { useCallback, useEffect, useState } from "react";
 import { gravarJSON, lerJSON } from "../armazenamento";
 import { ehObjeto } from "../normalizar";
@@ -71,7 +70,7 @@ export function useCarrinho(email: string) {
 
   const limpar = useCallback(() => setItens([]), []);
 
-  /** Tira do carrinho os produtos já enviados num pedido (mantém o que entrou depois). */
+  // Mantém o que entrou no carrinho enquanto o pedido era enviado.
   const removerEnviados = useCallback((codigos: string[]) => {
     const enviados = new Set(codigos);
     setItens((atuais) => atuais.filter((item) => !enviados.has(item.codigo)));

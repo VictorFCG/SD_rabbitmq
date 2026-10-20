@@ -1,23 +1,9 @@
-# Microsservico Pagamento: cobranca dos pedidos com estoque confirmado por meio do
-# provedor de pagamentos externo (Mock de Pagamento).
+# Microsservico Pagamento: cobranca dos pedidos no Mock de Pagamento (externo).
 # Exchange eCommerce (tipo direct). Fila propria: fila.pagamento.
-# Consome:
-#   pedido.estoque_ok - solicita via REST ao Mock a criacao da cobranca, passando a
-#                       URL de Webhook deste servico, e publica pagamento.pendente com
-#                       a URL de checkout (o frontend a abre em uma nova aba); se a
-#                       cobranca nao puder ser criada publica pagamento.recusado.
-#   pedido.excluido   - cancela a cobranca ainda pendente do pedido (tambem no Mock).
-# HTTP (FastAPI):
-#   POST /webhooks/pagamento     - Webhook do Mock com o status APROVADO ou RECUSADO
-#                                  (corpo autenticado por HMAC-SHA256); publica
-#                                  pagamento.aprovado ou pagamento.recusado.
-#   GET  /pagamentos/{id_pedido} - consulta a cobranca de um pedido.
-#   GET  /saude
-# Publica: pagamento.pendente, pagamento.aprovado, pagamento.recusado.
-# Persistencia: as cobrancas e os pedidos excluidos ficam em memoria e cada mudanca
-# e gravada em SQLite (data/pagamentos.db, pagamentos_db.py); ao iniciar o servico
-# recarrega esse estado, entao o Webhook de uma cobranca criada antes de um
-# reinicio continua sendo aceito.
+# Consome: pedido.estoque_ok (cria a cobranca) e pedido.excluido (cancela).
+# Publica: pagamento.pendente, pagamento.aprovado e pagamento.recusado.
+# O Mock informa o resultado pelo Webhook POST /webhooks/pagamento (HMAC-SHA256).
+# Cobrancas gravadas em SQLite (data/pagamentos.db) e recarregadas ao iniciar.
 import hashlib
 import hmac
 import sqlite3
@@ -100,11 +86,7 @@ def url_mock(caminho):
     return config.URL_MOCK_PAGAMENTO.rstrip("/") + caminho
 
 
-# --- Persistencia (SQLite) ----------------------------------------------------
-# As gravacoes acontecem com o lock adquirido, na mesma ordem das mudancas em
-# memoria. Uma falha do SQLite so e registrada no log: enquanto o processo estiver
-# no ar vale o estado em memoria.
-
+# Falha no SQLite so vai para o log: com o processo no ar vale o estado em memoria.
 def gravar_cobranca(cobranca):
     if db is None:
         return
@@ -130,7 +112,6 @@ def gravar_exclusao(id_pedido):
 
 
 def restaurar_cobrancas():
-    # Recarrega o estado gravado antes do reinicio; retorna o numero de cobrancas.
     salvas, excluidos = db.carregar()
     with lock:
         cobrancas.clear()
@@ -142,8 +123,7 @@ def restaurar_cobrancas():
     return len(salvas)
 
 
-# --- Cobranca no Mock (pedido.estoque_ok / pedido.excluido) -------------------
-
+# PDF (0,1): pede ao Mock a cobranca (URL de checkout), informando a URL de Webhook.
 def corpo_da_cobranca(pedido, valor):
     id_pedido = pedido["id_pedido"]
     quantidade = sum(item.get("quantidade", 0) for item in pedido.get("itens") or [])
@@ -171,7 +151,7 @@ def ler_cobranca_criada(resposta, id_pedido):
 
 
 def solicitar_cobranca(pedido, valor):
-    # Repete em falhas de rede/5xx (pausas de 1 s e 2 s); um 4xx e definitivo.
+    # Repete em falha de rede ou 5xx; um 4xx e definitivo.
     id_pedido = pedido["id_pedido"]
     corpo = corpo_da_cobranca(pedido, valor)
     for tentativa in range(1, TENTATIVAS_MOCK + 1):
@@ -318,8 +298,6 @@ def handle(routing_key, data):
         cancelar_pagamento(data)
 
 
-# --- Webhook do Mock de Pagamento ---------------------------------------------
-
 def assinatura_valida(corpo, assinatura):
     if not assinatura:
         return False
@@ -370,9 +348,7 @@ def publicar_resultado(cobranca):
 
 
 def desfazer_status(cobranca, status):
-    # Chamada com o lock adquirido. Sem a publicacao o Mock precisa poder reenviar
-    # o Webhook; se o pedido foi excluido nesse meio tempo a cobranca nao volta a
-    # ficar pendente.
+    # Chamada com o lock adquirido; volta a PENDENTE para o Mock reenviar o Webhook.
     if cobranca["status"] == status:
         excluido = cobranca["id_pedido"] in pedidos_excluidos
         cobranca["status"] = CANCELADO if excluido else PENDENTE
@@ -381,9 +357,7 @@ def desfazer_status(cobranca, status):
 
 
 def encerrar_publicacao(cobranca, status, publicado):
-    # A marca de publicacao sai sob o mesmo lock que grava ou desfaz o novo status.
-    # Ele so vai para o banco depois de publicado: se o processo cair no meio da
-    # publicacao, apos o reinicio a cobranca segue pendente e o Mock pode reenviar.
+    # Grava so depois de publicar: se o processo cair antes, a cobranca segue PENDENTE.
     with lock:
         em_publicacao.discard(cobranca["id_cobranca"])
         if publicado:
@@ -393,10 +367,7 @@ def encerrar_publicacao(cobranca, status, publicado):
 
 
 def processar_webhook(notificacao):
-    # A transicao acontece sob o lock (Webhooks repetidos e simultaneos publicam
-    # uma unica vez); a publicacao, fora dele. Enquanto ela nao termina, um Webhook
-    # repetido recebe 503 e nao ja_processado: se a publicacao falhar, o Mock ainda
-    # precisa reenviar.
+    # Webhook repetido durante a publicacao recebe 503: se ela falhar, o Mock reenvia.
     status = notificacao.status
     with lock:
         cobranca = cobranca_do_webhook(notificacao)
@@ -434,6 +405,7 @@ def processar_webhook(notificacao):
     return {"resultado": "processado", "status": status}
 
 
+# PDF (0,1): endpoint que recebe o Webhook do Mock com o status APROVADO ou RECUSADO.
 @app.post(
     "/webhooks/pagamento",
     summary="Recebe o Webhook do Mock de Pagamento",

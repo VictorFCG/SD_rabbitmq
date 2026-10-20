@@ -7,7 +7,6 @@ import { SeletorQuantidade } from "./SeletorQuantidade";
 interface Props {
   produto: Produto;
   noCarrinho: number;
-  /** Retorna true se o item entrou no carrinho. */
   aoAdicionar: (produto: Produto, quantidade: number) => boolean;
 }
 

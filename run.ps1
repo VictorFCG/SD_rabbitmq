@@ -10,7 +10,6 @@ Set-Location -LiteralPath $Root
 $MinPython = [version]"3.10"
 $PyModules = "pika, Crypto, fastapi.sse, uvicorn, httpx"
 $VenvPython = Join-Path $Root ".venv\Scripts\python.exe"
-# Processos Python, na ordem de inicializacao (o API Gateway por ultimo).
 $Services = @("ms_estoque", "ms_pagamento", "ms_entrega", "ms_promocoes", "mock_pagamento", "ms_principal")
 # Portas dos processos com HTTP (o ms_entrega so usa o RabbitMQ).
 $HttpPorts = [ordered]@{
@@ -25,10 +24,8 @@ $Frontend = Join-Path $Root "frontend"
 $GatewayHealthUrl = "http://127.0.0.1:8001/api/saude"
 $StoreUrl = "http://localhost:5173"
 
-# Executa um comando nativo com $ErrorActionPreference = "Continue": no Windows
-# PowerShell 5.1, comandos nativos (docker, pip) escrevem status no stderr e o
-# "Stop" os trataria como erro terminante (NativeCommandError). O exit code fica
-# disponivel em $NativeExit.
+# No Windows PowerShell 5.1, com "Stop", o stderr de comandos nativos (docker, pip)
+# vira erro terminante (NativeCommandError). O exit code fica em $NativeExit.
 function Invoke-Native {
     param([Parameter(Mandatory)][scriptblock]$Block)
     $previous = $ErrorActionPreference
@@ -38,8 +35,7 @@ function Invoke-Native {
     $ErrorActionPreference = $previous
 }
 
-# Versao (major.minor) do interpretador, ou $null se ele nao executar (ex.: o
-# atalho "python" da Microsoft Store sem o Python instalado).
+# $null se nao executar (ex.: o atalho "python" da Microsoft Store sem o Python).
 function Get-PythonVersion {
     param([string]$Command)
     $out = Invoke-Native { & $Command -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null }
@@ -53,8 +49,6 @@ function Test-PythonDeps {
     return ($NativeExit -eq 0)
 }
 
-# O .venv do projeto serve se tiver Python >= 3.10 e as dependencias (ou o pip
-# para instala-las); senao a etapa 2 cria (ou recria) o .venv.
 function Test-VenvPython {
     if (-not (Test-Path -LiteralPath $VenvPython)) { return $false }
     $version = Get-PythonVersion $VenvPython
@@ -64,8 +58,6 @@ function Test-VenvPython {
     return ($NativeExit -eq 0)
 }
 
-# Prefere o .venv do projeto; senao usa "python" ou "py" com versao >= 3.10, que
-# cria o .venv na etapa 2.
 function Get-Python {
     if (Test-VenvPython) { return $VenvPython }
     $tooOld = @()
@@ -82,7 +74,6 @@ function Get-Python {
     throw "Python nao encontrado ou nao executavel no PATH. $hint"
 }
 
-# Portas TCP com algum processo escutando (IPv4 e IPv6).
 function Get-ListeningPorts {
     try {
         $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
@@ -109,8 +100,7 @@ function Test-Url {
     }
 }
 
-# Abre uma janela do PowerShell com o titulo informado e executa o comando na
-# pasta indicada; -NoExit mantem a janela aberta para ver o log e os erros.
+# -NoExit mantem a janela aberta para ver o log e os erros.
 function Start-Window {
     param([string]$Title, [string]$Folder, [string]$Command)
     $folderLiteral = $Folder.Replace("'", "''")
@@ -140,8 +130,7 @@ function Test-NodeVersion {
     return (($version -ge [version]"22.12") -or ($version.Major -eq 20 -and $version -ge [version]"20.19"))
 }
 
-# npm install quando node_modules nao existe, ficou incompleto ou o package.json
-# mudou depois da ultima instalacao (o npm grava node_modules\.package-lock.json).
+# O npm grava node_modules\.package-lock.json a cada install.
 function Test-FrontendInstallNeeded {
     $marker = Join-Path $Frontend "node_modules\.package-lock.json"
     if (-not (Test-Path -LiteralPath $marker)) { return $true }
@@ -157,7 +146,6 @@ function Write-Url {
 $Python = Get-Python
 Write-Host "Python: $Python ($(Get-PythonVersion $Python))"
 
-# 1. RabbitMQ e Mailpit via docker compose -----------------------------------
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker nao encontrado. Abra o Docker Desktop e tente novamente."
 }
@@ -192,9 +180,6 @@ if ($NativeExit -ne 0) {
 Write-Host "RabbitMQ pronto (painel: http://localhost:15672, guest/guest)."
 Write-Host "Mailpit pronto (e-mails: http://localhost:8025)."
 
-# 2. Dependencias e chaves ----------------------------------------------------
-# Sem um .venv utilizavel, cria-o com o Python encontrado (--clear descarta um
-# .venv quebrado); so instala nesse Python se nao conseguir criar o .venv.
 if ($Python -ne $VenvPython) {
     $acao = "Criando"
     if (Test-Path -LiteralPath (Join-Path $Root ".venv")) { $acao = "Recriando" }
@@ -222,14 +207,12 @@ Write-Host "Verificando as chaves RSA (geradas so na primeira execucao)..."
 Invoke-Native { & $Python setup_keys.py 2>&1 | ForEach-Object { "$_" } }
 if ($NativeExit -ne 0) { throw "Falha ao gerar/distribuir as chaves." }
 
-# 3. Inicia os servicos em janelas separadas ---------------------------------
 $pythonLiteral = $Python.Replace("'", "''")
 foreach ($s in $Services) {
     Write-Host "Iniciando $s..."
     Start-Window $s $Root "& '$pythonLiteral' '$s/main.py'"
 }
 
-# 4. Aguarda o API Gateway (e as portas dos demais servicos HTTP) -------------
 Write-Host "Aguardando o API Gateway responder em $GatewayHealthUrl..."
 $deadline = (Get-Date).AddSeconds(30)
 $gatewayReady = $false
@@ -250,7 +233,6 @@ foreach ($name in $notListening) {
     Write-Host "AVISO: $name nao esta escutando na porta $($HttpPorts[$name]). Veja a janela '$name'." -ForegroundColor Yellow
 }
 
-# 5. Frontend (React + Vite) em sua propria janela ---------------------------
 $frontendProblem = ""
 $npm = Get-Npm
 if (-not (Get-Command node -ErrorAction SilentlyContinue) -or -not $npm) {
@@ -301,7 +283,6 @@ if (-not $frontendProblem) {
     }
 }
 
-# 6. Resumo -------------------------------------------------------------------
 $storeLine = $StoreUrl
 if ($frontendProblem) { $storeLine = "$StoreUrl (nao iniciado: $frontendProblem)" }
 Write-Host ""

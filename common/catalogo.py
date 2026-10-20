@@ -1,8 +1,6 @@
 # Catalogo de produtos (dados de apoio aos processos).
-# Trab2: o MS Estoque e o dono dos dados dos produtos - usa este catalogo apenas
-# para popular o seu banco (SQLite) na primeira execucao e o expoe via REST ao
-# API Gateway. O MS Promocoes usa o catalogo para sortear produtos/categorias das
-# promocoes (routing keys promocao.categoria.<A|B|C>).
+# Usado pelo MS Estoque para popular o seu banco na primeira execucao e pelo
+# MS Promocoes para sortear os produtos das promocoes (promocao.categoria.<A|B|C>).
 CATEGORIAS = {
     "A": "Computadores e monitores",
     "B": "Periféricos",
