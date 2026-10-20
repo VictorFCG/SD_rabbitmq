@@ -15,6 +15,12 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 
+# Produtores conhecidos (um par de chaves cada, gerado por setup_keys.py). O campo
+# "service" do envelope so e aceito se estiver aqui: ele vira nome de arquivo da
+# chave publica, entao um valor como "../x" ou um caminho absoluto nao pode chegar
+# ao sistema de arquivos.
+SERVICOS = ("principal", "estoque", "pagamento", "entrega", "promocoes")
+
 
 def canonical_bytes(obj):
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
@@ -59,7 +65,7 @@ def verify_envelope(envelope, key_dir):
         return False
     content = {k: v for k, v in envelope.items() if k != "Signature"}
     producer = content.get("service")
-    if not producer:
+    if not isinstance(producer, str) or producer not in SERVICOS:
         return False
     try:
         public_key = load_public(Path(key_dir) / f"{producer}_public.pem")

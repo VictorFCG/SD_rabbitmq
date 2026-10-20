@@ -5,3 +5,9 @@ logs/
 venv/
 keys/
 *.pdf
+.env
+data/
+*.db
+node_modules/
+frontend/dist/
+.pytest_cache/
