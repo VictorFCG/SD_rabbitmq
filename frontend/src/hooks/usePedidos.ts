@@ -1,8 +1,5 @@
-// Pedidos do cliente. As atualizações chegam por três caminhos (resposta do POST,
-// eventos SSE e a listagem GET /api/pedidos usada para ressincronizar) e em qualquer
-// ordem; por isso cada pedido só é substituído por uma versão pelo menos tão recente
-// (ver ehVersaoMaisRecente). O mapa fica num ref para leitura síncrona; o estado
-// React é apenas a lista ordenada derivada dele.
+// Atualizações chegam pelo POST, pelo SSE e pela listagem, em qualquer ordem: um pedido só é
+// substituído por uma versão pelo menos tão recente (ehVersaoMaisRecente).
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { listarPedidos, mensagemDeErro } from "../api";
 import { ehVersaoMaisRecente, ordenarPedidos } from "../normalizar";
@@ -11,7 +8,6 @@ import type { Pedido } from "../tipos";
 export interface EstadoPedidos {
   pedidos: Pedido[];
   carregando: boolean;
-  /** true depois da primeira resposta (com sucesso ou erro) da listagem. */
   carregou: boolean;
   erro: string | null;
   aplicar: (recebidos: Pedido[]) => void;
@@ -68,8 +64,7 @@ export function usePedidos(email: string, aoAtualizar: (pedido: Pedido) => void)
     try {
       const lista = await listarPedidos(email);
       if (minha !== sequencia.current) return;
-      // Pedidos que o servidor não conhece mais saem da lista, exceto os que chegaram
-      // (POST/SSE) depois que esta consulta começou.
+      // Remove o que o servidor não conhece mais, exceto o que chegou (POST/SSE) durante esta consulta.
       const noServidor = new Set(lista.map((pedido) => pedido.id_pedido));
       let removeu = false;
       for (const id of [...mapa.current.keys()]) {

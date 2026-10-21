@@ -1,5 +1,4 @@
-# Testes do codigo compartilhado (common/) e da geracao de chaves (setup_keys.py):
-# verificacao dos envelopes assinados, leitura do .env e chaves idempotentes.
+# Testes de common/ (envelopes assinados, leitura do .env) e de setup_keys.py.
 import os
 
 import pytest
@@ -13,7 +12,6 @@ from common.crypto_utils import build_envelope, generate_keypair, load_private, 
 
 @pytest.fixture
 def chaves(tmp_path):
-    # Pasta de chaves de um consumidor que conhece apenas o produtor "estoque".
     pasta = tmp_path / "keys"
     pasta.mkdir()
     privada, publica = generate_keypair()
@@ -42,8 +40,6 @@ def test_produtor_desconhecido_e_descartado(chaves, servico):
 
 
 def test_campo_service_nao_vira_caminho_de_arquivo(chaves, tmp_path):
-    # Um atacante com a propria chave nao pode apontar "service" para ela: nem por
-    # caminho absoluto nem por "../" (a chave usada vem so da pasta keys/).
     privada, publica = generate_keypair()
     fora = tmp_path / "fora"
     fora.mkdir()

@@ -1,7 +1,5 @@
-# Testes unitarios do MS Pagamento: criacao/cancelamento da cobranca no Mock
-# (httpx.MockTransport) a partir dos eventos, o endpoint de Webhook (TestClient) e
-# a persistencia em SQLite (pasta temporaria), inclusive um reinicio simulado.
-# Nao dependem de RabbitMQ: o Publisher e substituido por um falso.
+# Testes do MS Pagamento: cobranca no Mock (httpx.MockTransport), Webhook, eventos e
+# cobrancas gravadas em SQLite (reinicio), com um publisher falso no lugar do RabbitMQ.
 import hashlib
 import hmac
 import json
@@ -70,8 +68,6 @@ class PublisherFalso:
 
 
 class MockPagamentoFalso:
-    # Simula o Mock de Pagamento; respostas_criacao define, em ordem, o resultado
-    # de cada POST /api/cobrancas (status HTTP ou excecao); vazio = 201.
     def __init__(self):
         self.chamadas = []
         self.respostas_criacao = []
@@ -135,8 +131,7 @@ def ctx(monkeypatch):
 
 @pytest.fixture
 def banco(ctx, tmp_path, monkeypatch):
-    # SQLite em pasta temporaria. ctx.reiniciar() simula um reinicio do servico:
-    # memoria vazia e estado recarregado por uma nova conexao com o mesmo arquivo.
+    # ctx.reiniciar() simula um reinicio: memoria vazia e estado relido do mesmo arquivo.
     abertos = []
 
     def abrir():
@@ -206,8 +201,6 @@ def status_da_cobranca(ctx, id_pedido=PEDIDO["id_pedido"]):
     return resposta.json()["status"]
 
 
-# --- Importacao -------------------------------------------------------------------
-
 def test_importar_nao_conecta_nem_inicia_threads():
     assert pagamento.publisher is None
     assert pagamento.db is None
@@ -216,8 +209,6 @@ def test_importar_nao_conecta_nem_inicia_threads():
     assert "keepalive-pagamento" not in nomes
     assert pagamento.app.title == "MS Pagamento"
 
-
-# --- pedido.estoque_ok --------------------------------------------------------
 
 def test_estoque_ok_cria_cobranca_no_mock_e_publica_pendente(ctx):
     pagamento.handle("pedido.estoque_ok", PEDIDO)
@@ -342,8 +333,6 @@ def test_pedido_excluido_durante_a_chamada_ao_mock_cancela_a_cobranca(ctx):
     assert status_da_cobranca(ctx) == "CANCELADO"
 
 
-# --- pedido.excluido ------------------------------------------------------------
-
 def test_pedido_excluido_cancela_a_cobranca_pendente(ctx):
     pendente = criar_cobranca_pendente(ctx)
     pagamento.handle("pedido.excluido", {"id_pedido": "PED1A2B3C4D", "motivo": "cancelado_pelo_cliente"})
@@ -383,8 +372,6 @@ def test_pedido_excluido_apos_recusa_nao_altera_a_cobranca(ctx):
     resposta = enviar_webhook(ctx, notificacao(pendente, "RECUSADO"))
     assert resposta.json() == {"resultado": "ja_processado", "status": "RECUSADO"}
 
-
-# --- Webhook --------------------------------------------------------------------
 
 def test_webhook_aprovado_publica_pagamento_aprovado(ctx):
     pendente = criar_cobranca_pendente(ctx)
@@ -530,8 +517,7 @@ def test_falha_ao_publicar_com_pedido_excluido_no_meio_cancela(ctx):
 
 
 def test_webhooks_simultaneos_publicam_uma_unica_vez(ctx):
-    # A primeira publicacao so termina depois que os 7 repetidos foram respondidos:
-    # todos chegam durante ela e recebem 503 (e nao ja_processado).
+    # A 1a publicacao so termina depois que os 7 repetidos respondem: todos recebem 503.
     pendente = criar_cobranca_pendente(ctx)
     respondidos = threading.Semaphore(0)
 
@@ -609,11 +595,55 @@ def test_repetido_durante_publicacao_que_falha_recebe_503(ctx):
     assert ctx.publicador.chaves() == ["pagamento.pendente", "pagamento.aprovado"]
 
 
-# --- Consultas --------------------------------------------------------------------
-
 def test_consulta_de_pedido_sem_cobranca_retorna_404(ctx):
     assert ctx.cliente.get("/pagamentos/PEDNAOEXISTE").status_code == 404
 
 
 def test_saude(ctx):
     assert ctx.cliente.get("/saude").json() == {"servico": "pagamento", "status": "ok"}
+
+
+def test_banco_guarda_e_recarrega_cobrancas_e_exclusoes(banco):
+    cobranca = {campo: None for campo in CAMPOS}
+    cobranca.update(id_cobranca="COB1", id_pedido="PED1", valor=10.0, status="PENDENTE")
+    banco.salvar_cobranca(cobranca)
+    banco.marcar_excluido("PED2")
+    banco.marcar_excluido("PED2")
+    cobrancas, excluidos = banco.carregar()
+    assert cobrancas == {"COB1": cobranca}
+    assert excluidos == {"PED2"}
+
+
+def test_webhook_depois_de_reiniciar_ainda_aprova(ctx, banco):
+    pendente = criar_cobranca_pendente(ctx)
+    assert status_gravado() == "PENDENTE"
+    assert ctx.reiniciar() == 1
+
+    resposta = enviar_webhook(ctx, notificacao(pendente))
+
+    assert resposta.status_code == 200
+    assert resposta.json()["resultado"] == "processado"
+    assert [rk for _, rk, _ in ctx.publicador.publicados].count("pagamento.aprovado") == 1
+    assert status_gravado() == "APROVADO"
+
+
+def test_pedido_excluido_continua_excluido_depois_de_reiniciar(ctx, banco):
+    pendente = criar_cobranca_pendente(ctx)
+    pagamento.handle("pedido.excluido", {"id_pedido": PEDIDO["id_pedido"], "motivo": "cancelado_pelo_cliente"})
+    ctx.reiniciar()
+
+    assert PEDIDO["id_pedido"] in pagamento.pedidos_excluidos
+    assert enviar_webhook(ctx, notificacao(pendente)).status_code == 409
+    assert status_gravado() == "CANCELADO"
+
+
+def test_falha_no_banco_nao_impede_o_webhook(ctx, banco, monkeypatch):
+    pendente = criar_cobranca_pendente(ctx)
+
+    def quebrar(_cobranca):
+        raise sqlite3.OperationalError("disco cheio")
+
+    monkeypatch.setattr(banco, "salvar_cobranca", quebrar)
+    resposta = enviar_webhook(ctx, notificacao(pendente))
+    assert resposta.status_code == 200
+    assert pagamento.cobrancas[pendente["id_cobranca"]]["status"] == "APROVADO"

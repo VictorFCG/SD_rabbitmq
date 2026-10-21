@@ -1,6 +1,3 @@
-// Avisos rápidos (toasts): somem sozinhos após ~6 s, pausam com o mouse/foco em cima
-// e ignoram repetições de uma mensagem que ainda está na tela (ex.: a resposta REST
-// e o evento SSE do mesmo cancelamento).
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Icone, type NomeIcone } from "./components/Icone";
 import type { Tom } from "./tipos";
@@ -15,7 +12,7 @@ interface Toast {
 }
 
 const DURACAO_MS = 6000;
-const MAXIMO_NA_TELA = 4; // em telas de até 480px, o CSS mostra só os 2 mais recentes
+const MAXIMO_NA_TELA = 4;
 
 const ICONES: Record<Tom, NomeIcone> = {
   sucesso: "sucesso",
@@ -68,6 +65,7 @@ export function ProvedorToasts({ children }: { children: ReactNode }) {
 
   const mostrar = useCallback<MostrarToast>(
     (tom, mensagem, titulo) => {
+      // A resposta REST e o evento SSE de um cancelamento trazem a mesma mensagem.
       const repetido = atuais.current.find((toast) => toast.mensagem === mensagem && toast.titulo === titulo);
       if (repetido) {
         agendar(repetido.id);
@@ -87,7 +85,7 @@ export function ProvedorToasts({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    // Reagenda após uma remontagem (StrictMode/Fast Refresh) e limpa ao desmontar.
+    // Reagenda após uma remontagem (StrictMode/Fast Refresh).
     const mapa = temporizadores.current;
     atuais.current.forEach((toast) => agendar(toast.id));
     return () => {

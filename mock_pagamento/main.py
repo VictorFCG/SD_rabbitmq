@@ -1,24 +1,8 @@
-# Mock de Pagamento "PayMock" (sistema externo).
-# Aplicacao web simples que simula um provedor de pagamentos. Fica fora do
-# backend: nao usa o RabbitMQ nem as chaves RSA e nao importa nada de common/
-# (le a configuracao do ambiente e do .env da raiz do projeto).
-# API REST (chamada pelo MS Pagamento):
-#   POST /api/cobrancas               - cria a cobranca (recebe a webhook_url da
-#                                       loja) e devolve a URL de checkout;
-#   GET  /api/cobrancas/{id}          - consulta a cobranca;
-#   POST /api/cobrancas/{id}/cancelar - cancela a cobranca ainda pendente.
-# Paginas no navegador (o frontend abre a URL de checkout em nova aba):
-#   GET  /checkout/{id}          - dados da cobranca e os botoes "Pagamento
-#                                  Aprovado" e "Pagamento Recusado";
-#   POST /checkout/{id}/decisao  - registra a escolha, envia o Webhook e
-#                                  redireciona (303) de volta ao checkout;
-#   POST /checkout/{id}/reenviar - reenvia o Webhook que nao foi entregue.
-# Webhook: POST na webhook_url com {"id_cobranca", "id_pedido", "status"
-# (APROVADO | RECUSADO), "valor", "data_hora"} e o cabecalho
-# X-Webhook-Signature = "sha256=" + HMAC-SHA256(WEBHOOK_SECRET, corpo).
-# Ate 3 tentativas em erro de rede ou HTTP 5xx; o envio nunca acontece com o
-# lock das cobrancas preso.
-# As cobrancas ficam apenas em memoria (somem quando o processo reinicia).
+# Mock de Pagamento "PayMock" (sistema externo): nao usa o RabbitMQ nem common/.
+# API REST usada pelo MS Pagamento (criar, consultar e cancelar cobrancas) e
+# pagina de checkout onde o cliente aprova ou recusa o pagamento.
+# O resultado vai para a loja por Webhook (POST na webhook_url), assinado com
+# HMAC-SHA256 no cabecalho X-Webhook-Signature. Cobrancas apenas em memoria.
 import copy
 import hashlib
 import hmac
@@ -45,7 +29,6 @@ import mock_paginas
 
 
 def _valor_env(bruto):
-    # Valor entre aspas e mantido inteiro; sem aspas, " # comentario" e removido.
     valor = bruto.strip()
     if valor[:1] in ("'", '"'):
         fim = valor.find(valor[0], 1)
@@ -58,8 +41,7 @@ def _valor_env(bruto):
 
 
 def _ler_env(caminho):
-    # Mesmas regras de common/config.py: CHAVE=VALOR, comentarios com "#",
-    # "export " opcional; a primeira ocorrencia vale.
+    # Mesmas regras de common/config.py (o mock nao importa common/).
     valores = {}
     if not caminho.is_file():
         return valores
@@ -78,7 +60,6 @@ _ARQUIVO_ENV = _ler_env(Path(__file__).resolve().parent.parent / ".env")
 
 
 def _env(nome, padrao):
-    # Variavel de ambiente vence o .env; valor vazio usa o padrao.
     valor = os.environ[nome] if nome in os.environ else _ARQUIVO_ENV.get(nome, "")
     return valor.strip() or padrao
 
@@ -89,7 +70,7 @@ URL_PUBLICA = _env("MOCK_PUBLIC_URL", f"http://127.0.0.1:{PORTA_MOCK}").rstrip("
 WEBHOOK_SECRET = _env("WEBHOOK_SECRET", "trab2-webhook-secret")
 
 TIMEOUT_WEBHOOK = 5.0
-ESPERAS_WEBHOOK = (0.5, 1.0)  # pausas entre as 3 tentativas de entrega
+ESPERAS_WEBHOOK = (0.5, 1.0)  # segundos entre as tentativas
 LIMITE_RESPOSTA = 500
 
 PENDENTE = "PENDENTE"
@@ -99,9 +80,9 @@ CANCELADO = "CANCELADO"
 DECISOES = (APROVADO, RECUSADO)
 
 cobrancas = {}
-em_envio = set()  # cobrancas com Webhook sendo enviado neste momento
+em_envio = set()
 lock = threading.Lock()
-transporte_webhook = None  # None = rede de verdade (os testes usam httpx.MockTransport)
+transporte_webhook = None  # os testes trocam por httpx.MockTransport
 
 
 def log(mensagem):
@@ -167,7 +148,6 @@ def ler_decisao(corpo):
     return decisao if decisao in DECISOES else None
 
 
-# --- Webhook -------------------------------------------------------------------
 def assinar(corpo):
     digest = hmac.new(WEBHOOK_SECRET.encode("utf-8"), corpo, hashlib.sha256).hexdigest()
     return "sha256=" + digest
@@ -180,7 +160,7 @@ def descrever_erro(exc):
 
 
 def enviar_webhook(url, payload):
-    # O corpo e serializado uma unica vez: a assinatura vale para todas as tentativas.
+    # Corpo serializado uma vez: a assinatura vale para todas as tentativas.
     corpo = json.dumps(payload).encode("utf-8")
     cabecalhos = {"Content-Type": "application/json", "X-Webhook-Signature": assinar(corpo)}
     rotulo = f"{payload['id_cobranca']} {payload['status']}"
@@ -195,7 +175,7 @@ def enviar_webhook(url, payload):
                 resultado.update(http_status=None, resposta=None, erro=descrever_erro(exc))
                 log(f"webhook {rotulo} -> {exc.__class__.__name__} (tentativa {tentativa}/{total})")
                 repetir = True
-            except Exception as exc:  # noqa: BLE001 - ex.: URL invalida; repetir nao adianta
+            except Exception as exc:  # noqa: BLE001 - repetir nao adianta
                 resultado.update(http_status=None, resposta=None, erro=descrever_erro(exc))
                 log(f"webhook {rotulo} -> {exc.__class__.__name__}")
                 break
@@ -217,7 +197,7 @@ def enviar_webhook(url, payload):
 
 
 def preparar_envio(cobranca):
-    # Chamada com o lock preso: marca o envio em andamento e copia os dados.
+    # Chamada com o lock preso.
     em_envio.add(cobranca["id_cobranca"])
     payload = {
         "id_cobranca": cobranca["id_cobranca"],
@@ -230,7 +210,7 @@ def preparar_envio(cobranca):
 
 
 def entregar_webhook(id_cobranca, url, payload):
-    # Chamada SEM o lock: a requisicao HTTP pode demorar varios segundos.
+    # Chamada sem o lock: a requisicao HTTP pode demorar.
     resultado = {
         "entregue": False,
         "http_status": None,
@@ -280,7 +260,6 @@ def registrar_decisao(id_cobranca, decisao):
     return RedirectResponse(f"/checkout/{id_cobranca}", status_code=303)
 
 
-# --- API -----------------------------------------------------------------------
 class ClienteCobranca(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -346,12 +325,12 @@ async def validacao_invalida(request: Request, exc: RequestValidationError):
     try:
         return await request_validation_exception_handler(request, exc)
     except ValueError:
-        # NaN/Infinity no corpo (aceitos pelo json do Python) nao cabem na
-        # resposta JSON: devolve o 422 sem repetir o valor recebido.
+        # NaN/Infinity no corpo quebram o 422 padrao (nao cabem em JSON).
         erros = [{k: v for k, v in erro.items() if k not in ("input", "ctx")} for erro in exc.errors()]
         return JSONResponse(status_code=422, content={"detail": jsonable_encoder(erros)})
 
 
+# PDF (0,1): processa via REST a solicitacao de cobranca do MS Pagamento.
 @app.post("/api/cobrancas", status_code=201, tags=[TAG_API], summary="Criar cobrança")
 def criar_cobranca(dados: NovaCobranca):
     cliente = dados.cliente.model_dump() if isinstance(dados.cliente, ClienteCobranca) else dados.cliente
@@ -418,6 +397,7 @@ def inicio():
     return html(mock_paginas.pagina_inicial())
 
 
+# PDF (0,1): pagina no navegador com os botoes "Pagamento Aprovado" e "Pagamento Recusado".
 @app.get(
     "/checkout/{id_cobranca}",
     response_class=HTMLResponse,
@@ -431,6 +411,7 @@ def checkout(id_cobranca: str):
     return html(mock_paginas.pagina_checkout(cobranca, enviando))
 
 
+# PDF (0,1): clique em "Pagamento Aprovado/Recusado" -> POST (Webhook) para a URL do MS Pagamento.
 @app.post(
     "/checkout/{id_cobranca}/decisao",
     response_class=HTMLResponse,
@@ -467,8 +448,7 @@ def reenviar_notificacao(id_cobranca: str):
 
 
 def desativar_edicao_rapida():
-    # Windows (console classico): com a "Edicao Rapida" ligada, selecionar texto na
-    # janela pausa o processo ate apertar Esc/Enter. Mesma logica de common/console.py.
+    # Mesma logica de common/console.py (Edicao Rapida do console do Windows).
     if os.name != "nt":
         return
     try:

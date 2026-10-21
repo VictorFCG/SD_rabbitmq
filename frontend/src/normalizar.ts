@@ -1,5 +1,4 @@
-// Validação defensiva das respostas REST e dos eventos SSE: campos ausentes ou com
-// tipo inesperado viram valores padrão em vez de derrubar a interface.
+// Campos ausentes ou de tipo inesperado viram valores padrão em vez de derrubar a interface.
 import { paraMs } from "./formatar";
 import { rotuloStatus } from "./status";
 import type {
@@ -146,7 +145,6 @@ export function normalizarEventoPedido(valor: unknown): EventoPedido | null {
   };
 }
 
-/** Pedidos mais novos primeiro (data de criação; empate pelo id). */
 export function ordenarPedidos(pedidos: Pedido[]): Pedido[] {
   return [...pedidos].sort((a, b) => {
     const diferenca = (paraMs(b.criado_em) || 0) - (paraMs(a.criado_em) || 0);
@@ -154,11 +152,7 @@ export function ordenarPedidos(pedidos: Pedido[]): Pedido[] {
   });
 }
 
-/**
- * Indica se `novo` é uma versão pelo menos tão recente quanto `atual` do mesmo pedido.
- * Cada transição de status acrescenta uma entrada ao histórico, então o tamanho do
- * histórico decide; empate pelo campo atualizado_em.
- */
+// Cada transição de status acrescenta uma entrada ao histórico, então o tamanho dele serve de versão.
 export function ehVersaoMaisRecente(novo: Pedido, atual: Pedido): boolean {
   if (novo.historico.length !== atual.historico.length) {
     return novo.historico.length > atual.historico.length;

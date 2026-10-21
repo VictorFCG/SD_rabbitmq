@@ -1,11 +1,8 @@
-# Persistencia do MS Pagamento (SQLite, modulo sqlite3 da biblioteca padrao).
-# Tabela cobrancas: cada cobranca criada no Mock de Pagamento, com o status atual.
-# Tabela pedidos_excluidos: pedidos recebidos em pedido.excluido (a cobranca deles
-#   nao volta a ficar pendente nem pode ser aprovada).
-# O main.py trabalha com o estado em memoria e grava aqui cada mudanca; ao iniciar,
-# carregar() devolve esse estado, para que um reinicio nao perca as cobrancas.
-# Uma unica conexao e compartilhada pela thread consumidora do RabbitMQ e pelas
-# threads do FastAPI, protegida por um lock.
+# Persistencia do MS Pagamento (SQLite).
+# Tabela cobrancas: cobrancas criadas no Mock, com o status atual.
+# Tabela pedidos_excluidos: pedidos recebidos em pedido.excluido.
+# O main.py grava aqui cada mudanca do estado em memoria e o recarrega ao iniciar.
+# Uma unica conexao compartilhada entre as threads, protegida por um lock.
 import sqlite3
 import threading
 from pathlib import Path
@@ -40,8 +37,6 @@ class PagamentosDB:
             self._conn.executescript(ESQUEMA)
 
     def carregar(self):
-        # Retorna (cobrancas por id_cobranca, da mais antiga para a mais recente;
-        # conjunto dos pedidos excluidos).
         with self._lock:
             linhas = self._conn.execute("SELECT * FROM cobrancas ORDER BY criado_em, id_cobranca").fetchall()
             excluidos = self._conn.execute("SELECT id_pedido FROM pedidos_excluidos").fetchall()

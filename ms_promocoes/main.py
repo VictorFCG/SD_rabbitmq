@@ -1,16 +1,8 @@
-# Microsservico Promocoes - promocoes de produtos e notificacao por e-mail dos
-# clientes interessados (API externa de e-mail: Resend; sem chave, Mailpit local).
+# Microsservico Promocoes: gera promocoes de produtos e as envia por e-mail aos
+# clientes interessados na categoria (API de e-mail: Resend ou Mailpit).
 # Exchange Promocoes (tipo topic).
-# Consome: interesse.promocao (publicado pelo MS Principal):
-#   INSCREVER - soma as categorias informadas as que o e-mail ja possui;
-#   CANCELAR  - remove as categorias informadas (todas, se a lista vier vazia).
-#   Os interesses (e-mail -> categorias) ficam no SQLite (data/promocoes.db) e o
-#   cliente recebe um e-mail confirmando a inscricao, alteracao ou cancelamento.
-# Publica: promocao.categoria.<A|B|C> - uma promocao gerada a cada
-#   PROMOCAO_INTERVALO segundos (o MS Principal a repassa aos navegadores via SSE).
-#   Para cada promocao identifica os clientes inscritos na categoria do produto e
-#   dispara a oferta por e-mail.
-# REST (porta 8004): GET /interesses/{email}, GET /promocoes/recentes, GET /saude.
+# Consome: interesse.promocao (INSCREVER/CANCELAR categorias de um e-mail).
+# Publica: promocao.categoria.<A|B|C> a cada PROMOCAO_INTERVALO segundos.
 # Fila propria: fila.promocoes.
 import math
 import random
@@ -42,8 +34,8 @@ CAMINHO_DB = Path(__file__).resolve().parent / "data" / "promocoes.db"
 
 NOME_LOJA = "Loja SD"
 DESCONTOS = [5, 10, 15, 20, 30, 50]
-ATRASO_PRIMEIRA_PROMOCAO = 5  # segundos apos a inicializacao
-INTERVALO_MINIMO = 1.0  # segundos (protege contra PROMOCAO_INTERVALO <= 0)
+ATRASO_PRIMEIRA_PROMOCAO = 5  # segundos
+INTERVALO_MINIMO = 1.0  # segundos
 MAX_RECENTES = 20
 REGEX_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ESTILO_P = "margin:0 0 12px;line-height:1.5"
@@ -81,7 +73,6 @@ def email_valido(email):
     return len(email) <= 254 and REGEX_EMAIL.match(email) is not None
 
 
-# --- E-mails ------------------------------------------------------------------
 def saudacao(nome):
     return f"Olá, {nome}!" if nome else "Olá!"
 
@@ -119,7 +110,6 @@ def oferta(promocao):
 
 
 def montar_email(titulo, nome, blocos, rodape):
-    # blocos: pares (html, texto) gerados por paragrafo/lista/oferta.
     loja = config.URL_FRONTEND
     corpo_html = "".join(html for html, _ in blocos)
     corpo_texto = "\n\n".join(texto for _, texto in blocos)
@@ -198,9 +188,7 @@ def enviar(para_email, para_nome, assunto, html, texto, avisar_sucesso=True):
     return ok
 
 
-# --- interesse.promocao -------------------------------------------------------
 def ler_categorias(valor):
-    # Devolve (categorias validas sem repeticao, quantidade de itens informados).
     if valor is None:
         return [], 0
     if isinstance(valor, str):
@@ -237,6 +225,7 @@ def cancelar(email, nome, categorias):
     enviar(email, nome, *email_cancelamento(nome, removidas, restantes))
 
 
+# PDF (0,1): consome interesse.promocao.
 def processar_interesse(data):
     if not isinstance(data, dict):
         log("interesse.promocao ignorado: payload invalido")
@@ -263,7 +252,6 @@ def handle(routing_key, data):
         processar_interesse(data)
 
 
-# --- Promocoes ----------------------------------------------------------------
 def sortear_promocao():
     codigo, produto = random.choice(list(PRODUTOS.items()))
     desconto = random.choice(DESCONTOS)
@@ -292,7 +280,6 @@ def listar_recentes():
 
 
 def notificar_interessados(promocao):
-    # Devolve (e-mails enviados, falhas).
     interessados = db.interessados(promocao["categoria"])
     enviados = 0
     for cliente in interessados:
@@ -302,6 +289,7 @@ def notificar_interessados(promocao):
     return enviados, len(interessados) - enviados
 
 
+# PDF (0,3): gera a promocao e envia e-mail aos interessados pela API externa (email_api).
 def gerar_promocao():
     promocao = sortear_promocao()
     routing_key = f"promocao.categoria.{promocao['categoria']}"
@@ -336,7 +324,6 @@ def gerar_promocoes(parar):
         espera = intervalo_promocoes()
 
 
-# --- REST ---------------------------------------------------------------------
 @app.get("/interesses/{email:path}", summary="Categorias de interesse de um e-mail")
 def consultar_interesses(email: str):
     email = normalizar_email(email)

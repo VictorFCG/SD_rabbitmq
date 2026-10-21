@@ -5,8 +5,7 @@ import { Loja } from "./components/Loja";
 import { ProvedorToasts } from "./toasts";
 import type { Cliente } from "./tipos";
 
-// Não há autenticação real: o e-mail (salvo no localStorage) identifica os pedidos
-// e o canal SSE do cliente.
+// Sem autenticação: o e-mail salvo no localStorage identifica os pedidos e o canal SSE.
 export default function App() {
   const [cliente, setCliente] = useState<Cliente | null>(lerCliente);
 

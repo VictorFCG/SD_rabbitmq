@@ -1,11 +1,7 @@
-# Assinatura e validacao digital dos eventos
-# Cada microsservico que publicar um evento deve: gerar um hash do conteudo doevento; 
-# assinar o evento com criptografia assimetrica usando a chave privada do produtor; 
-# incluir a assinatura digital no campo Signature do envelope.
-# Cada microsservico que consumir deve: obter a chave publica do produtor;
-# verificar a assinatura; 
-# confirmar autenticidade e integridade; 
-# processar o evento somente se a assinatura for valida (caso contrario, descartar).
+# Assinatura e validacao digital dos eventos.
+# O produtor assina o hash do evento com a sua chave privada (campo Signature do
+# envelope); o consumidor verifica com a chave publica do produtor e descarta o
+# evento se a assinatura for invalida.
 # Algoritmo: RSA + PKCS#1 v1.5 sobre SHA-256 (pycryptodome).
 import base64
 import json
@@ -15,10 +11,7 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 
-# Produtores conhecidos (um par de chaves cada, gerado por setup_keys.py). O campo
-# "service" do envelope so e aceito se estiver aqui: ele vira nome de arquivo da
-# chave publica, entao um valor como "../x" ou um caminho absoluto nao pode chegar
-# ao sistema de arquivos.
+# Unicos produtores aceitos: o campo "service" vira nome do arquivo da chave publica.
 SERVICOS = ("principal", "estoque", "pagamento", "entrega", "promocoes")
 
 

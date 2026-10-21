@@ -1,9 +1,5 @@
-// Aba de pagamento aberta ao finalizar um pedido. Ela é aberta ainda dentro do clique
-// (antes de qualquer await, senão o bloqueador de pop-ups a impede) com uma página de
-// espera; quando o pedido chega a AGUARDANDO_PAGAMENTO com a url_pagamento (pela
-// resposta REST ou pelo SSE, em qualquer ordem) a aba é levada ao Mock de Pagamento.
-// Se o pedido falhar antes disso, a aba mostra o motivo; se a loja for recarregada,
-// fechada ou trocar de usuário antes, a aba indica o botão "Pagar agora".
+// Abre a aba de pagamento ainda no clique (depois de um await o bloqueador de pop-ups a barra),
+// com uma página de espera, e a leva à url_pagamento quando ela chega pelo REST ou pelo SSE.
 import { useCallback, useEffect, useRef } from "react";
 import { ehUrlHttp, juntarFrases } from "../formatar";
 import type { MostrarToast } from "../toasts";
@@ -99,7 +95,7 @@ function escreverPagina(janela: Window, titulo: string, texto: string, detalhe: 
     );
     documento.close();
   } catch {
-    // A aba já navegou para outra origem ou foi fechada: nada a fazer.
+    // A aba foi fechada ou já está em outra origem.
   }
 }
 
@@ -115,7 +111,6 @@ function navegar(janela: Window, url: string): boolean {
 export function useAbasPagamento(mostrarToast: MostrarToast) {
   const registros = useRef(new Map<string, RegistroAba>());
 
-  /** Deve ser chamada de forma síncrona dentro do clique em "Finalizar pedido". */
   const abrir = useCallback((): Window | null => {
     let janela: Window | null = null;
     try {
@@ -125,11 +120,8 @@ export function useAbasPagamento(mostrarToast: MostrarToast) {
     }
     if (!janela) return null;
     try {
-      // A página do provedor externo não recebe referência à loja (window.opener).
       janela.opener = null;
-    } catch {
-      // ignorado
-    }
+    } catch {}
     escreverPagina(
       janela,
       "Pagamento - aguardando",
@@ -143,12 +135,10 @@ export function useAbasPagamento(mostrarToast: MostrarToast) {
   const fechar = useCallback((janela: Window | null) => {
     try {
       if (janela && !janela.closed) janela.close();
-    } catch {
-      // ignorado
-    }
+    } catch {}
   }, []);
 
-  /** Chamada com a resposta do POST, antes de aplicar o pedido: a aba ainda está na página de espera. */
+  /** Chamar antes de aplicar o pedido do POST: o SSE pode já ter trazido o link de pagamento. */
   const registrar = useCallback((idPedido: string, janela: Window | null) => {
     registros.current.set(idPedido, { janela, concluido: false });
     if (!janela || janela.closed) return;
@@ -162,9 +152,7 @@ export function useAbasPagamento(mostrarToast: MostrarToast) {
   }, []);
 
   useEffect(() => {
-    // Recarregar ou fechar a loja (pagehide) ou trocar de usuário (desmontagem) encerra o
-    // acompanhamento: as abas ainda em espera trocam o "aguardando" pelo caminho manual.
-    // No StrictMode, a desmontagem simulada acontece com o mapa ainda vazio.
+    // Recarregar/fechar a loja ou trocar de usuário: as abas em espera passam a indicar o "Pagar agora".
     const mapa = registros.current;
     const encerrarEsperas = () => {
       for (const [idPedido, registro] of mapa) {
@@ -190,7 +178,6 @@ export function useAbasPagamento(mostrarToast: MostrarToast) {
     };
   }, []);
 
-  /** Chamada a cada atualização de pedido (REST ou SSE) com a versão mais recente dele. */
   const sincronizar = useCallback(
     (pedido: Pedido) => {
       const registro = registros.current.get(pedido.id_pedido);

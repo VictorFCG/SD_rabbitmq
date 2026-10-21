@@ -1,9 +1,5 @@
-# Testes do frontend web (React + TypeScript, pasta frontend/).
-# Sem precisar do Node, conferem o que o contrato do Trab2 exige dos arquivos:
-# versoes fixas das dependencias, portas do Vite, endpoints REST e eventos SSE
-# usados, rotulos dos status, textos da aba de pagamento e ausencia de recursos
-# externos (CDN/fontes). Se o Node e o node_modules estiverem presentes, roda
-# tambem a checagem de tipos (tsc) e o build do Vite numa pasta temporaria.
+# Confere os arquivos do frontend (frontend/) sem precisar do Node. Se houver
+# Node e node_modules, roda tambem o tsc e o build do Vite.
 import json
 import re
 import shutil

@@ -1,6 +1,3 @@
-// Cliente REST do API Gateway (MS Principal). Toda chamada passa por requisitar(),
-// que aplica tempo limite e converte falhas de rede e respostas de erro do FastAPI
-// ({"detail": string | [{"loc", "msg"}]}) em ErroApi com mensagem legível.
 import { juntarFrases } from "./formatar";
 import {
   ehObjeto,
@@ -29,7 +26,6 @@ const MENSAGEM_RESPOSTA_INVALIDA = "Resposta inesperada do API Gateway (MS Princ
 const TEMPO_LIMITE_MS = 15000;
 
 export class ErroApi extends Error {
-  /** Código HTTP da resposta; 0 quando a requisição nem chegou ao servidor. */
   readonly status: number;
 
   constructor(mensagem: string, status: number) {
@@ -44,12 +40,11 @@ export function mensagemDeErro(erro: unknown): string {
   return "Ocorreu um erro inesperado.";
 }
 
-/** O gateway respondeu, mas o serviço por trás dele está fora do ar (502/503/504). */
 export function ehIndisponibilidade(erro: unknown): boolean {
   return erro instanceof ErroApi && (erro.status === 502 || erro.status === 503 || erro.status === 504);
 }
 
-/** Um item do 422 do gateway, que já vem em português (ex.: "Deve ser maior ou igual a 1."). */
+// Erros do FastAPI: {"detail": string | [{"loc", "msg"}]}.
 function formatarErroValidacao(item: unknown): string {
   if (typeof item === "string") return item;
   if (!ehObjeto(item)) return "";
@@ -143,6 +138,7 @@ function comoRespostaInteresse(corpo: unknown, dados: { email: string; categoria
 
 const segmento = encodeURIComponent;
 
+// PDF (Frontend 0,5): catálogo e pedidos via REST no API Gateway.
 export async function listarProdutos(): Promise<Produto[]> {
   return comoLista(await requisitar("/api/produtos?incluir_esgotados=true"), normalizarProduto);
 }
@@ -187,7 +183,6 @@ export async function listarPromocoesRecentes(): Promise<Promocao[]> {
   return comoLista(await requisitar("/api/promocoes/recentes"), normalizarPromocao);
 }
 
-/** URL do fluxo SSE do cliente; `ultimoId` pede o reenvio dos eventos perdidos. */
 export function urlEventos(email: string, ultimoId?: string): string {
   const base = `${API_URL}/api/eventos?email=${encodeURIComponent(email)}`;
   return ultimoId ? `${base}&ultimo_id=${encodeURIComponent(ultimoId)}` : base;

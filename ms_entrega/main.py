@@ -1,10 +1,8 @@
 # Microsservico Entrega: emissao da nota fiscal e despacho dos produtos.
 # Exchange eCommerce (tipo direct). Fila propria: fila.entrega.
 # Consome: pagamento.aprovado.
-# Para cada pedido com o pagamento aprovado simula a emissao da nota fiscal e o
-# despacho do produto (pausas curtas que somam ENTREGA_DELAY segundos, padrao 2) e
+# Simula a emissao da nota e o despacho (ENTREGA_DELAY segundos, padrao 2) e
 # publica pedido.enviado com a nota fiscal e o codigo de rastreio.
-# Eventos repetidos de um pedido ja enviado sao ignorados.
 import math
 import os
 import random
@@ -68,8 +66,7 @@ def enviar_pedido(dados):
             "enviado_em": datetime.now(timezone.utc).isoformat(),
         },
     )
-    # So marca como enviado depois de publicar: se a publicacao falhar, uma nova
-    # entrega da mensagem pelo RabbitMQ ainda gera o pedido.enviado.
+    # So marca depois de publicar: se a publicacao falhar, uma reentrega tenta de novo.
     pedidos_enviados.add(id_pedido)
     print(f"[entrega] pedido {id_pedido} enviado (pedido.enviado publicado)")
 

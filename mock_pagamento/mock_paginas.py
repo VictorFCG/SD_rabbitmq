@@ -1,9 +1,6 @@
-# Paginas HTML do Mock de Pagamento "PayMock" (sistema externo).
-# Checkout visto pelo cliente na nova aba aberta pelo frontend: dados da cobranca
-# e os botoes "Pagamento Aprovado" / "Pagamento Recusado"; depois da escolha, o
-# status final e o resultado da notificacao (Webhook) enviada a loja.
-# Paginas autocontidas (CSS e scripts inline, sem fontes, imagens ou CDN
-# externos), responsivas e em pt-BR. Todo valor dinamico passa por html.escape.
+# Paginas HTML do Mock de Pagamento "PayMock" (CSS e scripts inline).
+# Checkout com os botoes "Pagamento Aprovado" / "Pagamento Recusado" e, depois
+# da escolha, o status final e o resultado do Webhook enviado a loja.
 from html import escape
 
 ROTULOS_STATUS = {
@@ -164,9 +161,7 @@ RODAPE = """<footer class="rodape">
   Nenhum valor é cobrado de verdade.
 </footer>"""
 
-# Desabilita os botoes no envio (evita clique duplo). Botao desabilitado nao vai
-# no formulario, entao o valor do botao clicado e copiado antes para o campo
-# oculto "decisao". Sem JavaScript o formulario continua funcionando.
+# Evita clique duplo; botao desabilitado nao e enviado, por isso o campo oculto.
 SCRIPT_DECISAO = """<script>
 (function () {
   var formulario = document.getElementById("form-decisao");

@@ -1,8 +1,5 @@
-# Testes do Mock de Pagamento "PayMock" (sistema externo): API REST de
-# cobrancas, pagina de checkout, decisao do cliente (POST -> 303 -> GET) e
-# Webhook assinado com HMAC-SHA256, repetido em erro de rede/HTTP 5xx.
-# Nao usam RabbitMQ, Docker nem outros processos: a loja que recebe o Webhook
-# e simulada com httpx.MockTransport.
+# Testes do Mock de Pagamento (PayMock): cobrancas, checkout e Webhook assinado.
+# A loja que recebe o Webhook e simulada com httpx.MockTransport.
 import ast
 import hashlib
 import hmac
@@ -28,8 +25,6 @@ URL_WEBHOOK = "http://loja.teste/webhooks/pagamento"
 
 
 class LojaFalsa:
-    # Destino do Webhook: guarda as requisicoes e responde na ordem de
-    # "respostas" (codigo HTTP ou "rede" para falha de conexao); depois, 200.
     def __init__(self):
         self.respostas = []
         self.requisicoes = []
@@ -97,7 +92,6 @@ def assinatura(corpo):
     return "sha256=" + hmac.new(SEGREDO.encode("utf-8"), corpo, hashlib.sha256).hexdigest()
 
 
-# --- API REST ------------------------------------------------------------------
 def test_criar_cobranca_devolve_url_de_checkout(cliente):
     resposta = cliente.post(
         "/api/cobrancas", json={"id_pedido": "PED1", "valor": 4500, "webhook_url": URL_WEBHOOK}
@@ -180,7 +174,6 @@ def test_criar_cobranca_com_valor_nao_finito_422(cliente, valor):
 
 
 def test_descricao_longa_e_aceita(cliente):
-    # A loja pode listar muitos itens na descricao: nao pode virar 422.
     descricao = ", ".join(f"Produto {n} x2" for n in range(60))
     id_cobranca = criar(cliente, descricao=descricao)
     assert consultar(cliente, id_cobranca)["descricao"] == descricao
@@ -233,7 +226,6 @@ def test_saude_e_pagina_inicial(cliente):
     assert "PayMock" in inicio.text
 
 
-# --- Pagina de checkout --------------------------------------------------------
 def test_pagina_checkout_pendente(cliente):
     id_cobranca = criar(cliente)
     resposta = cliente.get(f"/checkout/{id_cobranca}")
@@ -255,7 +247,6 @@ def test_pagina_checkout_pendente(cliente):
     assert '<input type="hidden" id="campo-decisao" name="decisao" value="">' in pagina
     assert "campo.value = evento.currentTarget.value" in pagina
     assert "botoes[j].disabled = true" in pagina
-    # Autocontida: nada carregado de fora.
     assert "<script src" not in pagina and 'rel="stylesheet"' not in pagina
     assert "https://" not in pagina
     assert "Fechar aba" not in pagina
@@ -290,7 +281,6 @@ def test_pagina_checkout_inexistente_404(cliente):
     assert "&lt;B&gt;COB" in resposta.text and "<B>COB" not in resposta.text
 
 
-# --- Decisao do cliente e Webhook ----------------------------------------------
 def test_decisao_aprovada_envia_webhook_assinado_e_redireciona(cliente, loja):
     id_cobranca = criar(cliente)
     resposta = decidir(cliente, id_cobranca, "APROVADO")
@@ -505,8 +495,7 @@ def test_webhook_enviado_sem_segurar_o_lock(cliente, loja):
 
 
 def test_cliques_simultaneos_enviam_um_unico_webhook(cliente, loja, monkeypatch):
-    # A loja demora a responder: enquanto o primeiro Webhook esta em envio, os
-    # outros cliques sao respondidos na hora (o lock nao fica preso no envio).
+    # Loja lenta: os outros cliques respondem na hora (o lock nao fica preso no envio).
     liberar = threading.Event()
 
     def loja_lenta(request):
@@ -562,7 +551,6 @@ def test_webhook_com_erro_inesperado_nao_derruba_a_pagina(cliente, monkeypatch):
     assert id_cobranca not in mock.em_envio
 
 
-# --- Funcoes auxiliares e configuracao -------------------------------------------
 @pytest.mark.parametrize(
     "valor, texto",
     [(4500, "R$ 4.500,00"), (0.5, "R$ 0,50"), (30, "R$ 30,00"), (1234567.891, "R$ 1.234.567,89")],

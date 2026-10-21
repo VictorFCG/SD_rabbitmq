@@ -30,8 +30,7 @@ function totalDoPedido(pedido: Pedido, porCodigo: Map<string, Produto>): number 
 }
 
 export function CartaoPedido({ pedido, porCodigo, cancelando, aoCancelar }: Props) {
-  // Cada nova versão do pedido (re)inicia a animação de destaque (nova key); o elemento
-  // sai ao fim da animação, para ela não se repetir quando a aba volta a ser exibida.
+  // O destaque sai no animationend, senão ele se repete quando a aba volta a ser exibida.
   const versao = `${pedido.status}|${pedido.atualizado_em}`;
   const [versaoExibida, setVersaoExibida] = useState(versao);
   const [destaque, setDestaque] = useState(0);

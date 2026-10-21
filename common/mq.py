@@ -1,15 +1,9 @@
 # Camada de mensageria (RabbitMQ) compartilhada pelos processos.
-# Comunicacao assincrona entre os microsservicos por eventos publicados/consumidos
-# no broker; routing keys hierarquicas; cada consumidor possui a sua propria fila.
 #   eCommerce (tipo direct) - eventos do fluxo de pedido.
 #   Promocoes (tipo topic)  - interesse.promocao e promocao.categoria.<A|B|C>.
-# Nao e permitido o uso de exchange fanout.
-# Publica todo evento em um envelope assinado (campo Signature) e o consumidor
-# verifica a assinatura antes de processar (assinatura invalida e descartada).
-# Trab2: os processos agora tambem atendem HTTP (varias threads), entao o
-# Publisher e thread-safe (lock), usa confirmacao de publicacao do broker e
-# reconecta se a conexao cair; o Consumer reconecta sozinho se o RabbitMQ
-# reiniciar ou ainda nao estiver no ar.
+# Cada consumidor possui a sua propria fila; nao se usa exchange fanout.
+# Todo evento vai em um envelope assinado (campo Signature) e o consumidor
+# descarta os que tiverem assinatura invalida.
 import json
 import threading
 import time
@@ -26,8 +20,8 @@ EXCHANGE_PROMOCOES = "Promoções"
 TIPOS_EXCHANGE = {EXCHANGE_ECOMMERCE: "direct", EXCHANGE_PROMOCOES: "topic"}
 
 TENTATIVAS_PUBLICACAO = 3
-INTERVALO_KEEPALIVE = 10  # segundos entre os heartbeats da conexao de publicacao
-INTERVALO_RECONEXAO = 3  # segundos de espera antes de reconectar o consumidor
+INTERVALO_KEEPALIVE = 10  # segundos
+INTERVALO_RECONEXAO = 3  # segundos
 
 
 def _connect(host):
@@ -94,8 +88,7 @@ class Publisher:
                     time.sleep(0.5 * tentativa)
 
     def _keepalive(self):
-        # A BlockingConnection so envia heartbeats quando processa I/O; sem isto
-        # uma conexao ociosa seria derrubada pelo broker.
+        # Mantem a conexao ociosa viva: a BlockingConnection so envia heartbeat com I/O.
         while True:
             time.sleep(INTERVALO_KEEPALIVE)
             with self._lock:
@@ -112,7 +105,7 @@ class Publisher:
 
 
 class Consumer:
-    # bindings: lista de pares (exchange, routing_key) ligados a fila propria.
+    # bindings: lista de pares (exchange, routing_key).
     def __init__(self, service, key_dir, queue, bindings, handler, host=None):
         self.service = service
         self.key_dir = Path(key_dir)
@@ -170,8 +163,6 @@ class Consumer:
                 pass
 
     def start(self):
-        # Bloqueia consumindo; se o RabbitMQ cair (ou ainda nao estiver no ar),
-        # tenta reconectar ate conseguir.
         while True:
             try:
                 self._consumir()

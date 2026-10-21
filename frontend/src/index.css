@@ -1,7 +1,3 @@
-/* ==========================================================================
-   Loja SD - estilos (sem frameworks; tema claro com variante escura automática)
-   ========================================================================== */
-
 :root {
   color-scheme: light;
   --fundo: #f4f5fa;
@@ -104,7 +100,7 @@
   }
 }
 
-/* --- Base ------------------------------------------------------------------ */
+/* Base */
 
 *,
 *::before,
@@ -199,7 +195,7 @@ button {
   top: 12px;
 }
 
-/* --- Botões ---------------------------------------------------------------- */
+/* Botões */
 
 .botao {
   display: inline-flex;
@@ -348,7 +344,7 @@ button {
   }
 }
 
-/* --- Selos, alertas e estados ---------------------------------------------- */
+/* Selos, alertas e estados */
 
 .selo {
   display: inline-flex;
@@ -495,7 +491,7 @@ button {
   box-shadow: var(--sombra);
 }
 
-/* --- Estrutura ------------------------------------------------------------- */
+/* Estrutura */
 
 .aplicacao {
   display: flex;
@@ -773,7 +769,7 @@ button {
   margin-top: 4px;
 }
 
-/* --- Seções ---------------------------------------------------------------- */
+/* Seções */
 
 .secao {
   min-width: 0;
@@ -808,7 +804,7 @@ button {
   font-size: 0.8rem;
 }
 
-/* --- Catálogo -------------------------------------------------------------- */
+/* Catálogo */
 
 .layout-catalogo {
   display: grid;
@@ -1059,7 +1055,7 @@ button {
   color: var(--texto-suave);
 }
 
-/* --- Carrinho -------------------------------------------------------------- */
+/* Carrinho */
 
 .carrinho {
   display: flex;
@@ -1179,7 +1175,7 @@ button {
   font-size: 0.92rem;
 }
 
-/* --- Pedidos --------------------------------------------------------------- */
+/* Pedidos */
 
 .lista-pedidos {
   display: grid;
@@ -1224,8 +1220,6 @@ button {
   animation: brilho 1.4s linear infinite;
 }
 
-/* Destaque de um card atualizado (pedido) ou recebido ao vivo (promoção). O elemento
-   é removido ao fim da animação. */
 .destaque {
   --cor-destaque: var(--primaria);
   position: absolute;
@@ -1530,7 +1524,7 @@ button {
   margin-left: auto;
 }
 
-/* --- Promoções ------------------------------------------------------------- */
+/* Promoções */
 
 .layout-promocoes {
   display: grid;
@@ -1785,7 +1779,7 @@ button {
   font-size: 1.25rem;
 }
 
-/* --- Notificações e avisos ------------------------------------------------- */
+/* Notificações e avisos */
 
 .painel-notificacoes {
   position: fixed;
@@ -1993,7 +1987,7 @@ button {
   color: var(--promocao);
 }
 
-/* --- Identificação --------------------------------------------------------- */
+/* Identificação */
 
 .identificacao {
   display: grid;
@@ -2039,7 +2033,7 @@ button {
   overflow-wrap: anywhere;
 }
 
-/* --- Responsividade -------------------------------------------------------- */
+/* Responsividade */
 
 @media (min-width: 960px) {
   .layout-catalogo {

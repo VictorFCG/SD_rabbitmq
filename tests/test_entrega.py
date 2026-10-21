@@ -1,5 +1,4 @@
-# Testes unitarios do MS Entrega: emissao da nota fiscal/rastreio, publicacao de
-# pedido.enviado e descarte de eventos repetidos. Nao dependem de RabbitMQ.
+# Testes do MS Entrega, com um publisher falso no lugar do RabbitMQ.
 import re
 import threading
 from datetime import datetime

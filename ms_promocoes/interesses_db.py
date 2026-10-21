@@ -1,9 +1,6 @@
-# Repositorio (SQLite) dos interesses dos clientes em promocoes (MS Promocoes).
-# Tabela interesses: uma linha por (email, categoria) em que o cliente se
-# inscreveu, com o nome informado e a data da inscricao. Os e-mails sao
-# normalizados (sem espacos nas pontas e em minusculas).
-# A conexao e usada pela thread consumidora (pika), pela thread geradora de
-# promocoes e pelas threads do FastAPI, por isso todo acesso passa pelo lock.
+# Interesses dos clientes em promocoes (MS Promocoes), em SQLite: uma linha por
+# (email, categoria). A conexao e compartilhada pelas threads do consumidor, do
+# gerador de promocoes e do FastAPI, por isso todo acesso passa pelo lock.
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -50,7 +47,6 @@ class InteressesDB:
         return linha[0] if linha else None
 
     def inscrever(self, email, nome, categorias):
-        # Soma as categorias as que o e-mail ja possui; devolve todas as atuais.
         email = normalizar_email(email)
         nome = _limpar_nome(nome)
         agora = datetime.now(timezone.utc).isoformat()
@@ -67,7 +63,6 @@ class InteressesDB:
             return self._categorias(email)
 
     def cancelar(self, email, categorias=None):
-        # Remove as categorias informadas (ou todas, se nenhuma); devolve as restantes.
         email = normalizar_email(email)
         with self._lock, self._conn:
             if categorias:

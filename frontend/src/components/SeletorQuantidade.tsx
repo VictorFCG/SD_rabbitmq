@@ -5,7 +5,6 @@ import { Icone } from "./Icone";
 interface Props {
   valor: number;
   aoMudar: (valor: number) => void;
-  /** Nome acessível do grupo (ex.: "Quantidade de Mouse sem Fio"). */
   rotulo: string;
   desabilitado?: boolean;
 }

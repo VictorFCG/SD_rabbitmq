@@ -1,7 +1,5 @@
-# Configuracao do pytest: deixa importaveis o pacote common e os modulos de cada
-# processo, e oferece carregar_main(pasta) para importar o main.py de um processo
-# com um nome de modulo unico (todos se chamam main.py).
-# Os testes unitarios nao dependem de RabbitMQ, Docker nem de outros processos.
+# Poe common/ e as pastas dos processos no sys.path. carregar_main(pasta) importa
+# o main.py de um processo com nome de modulo unico (todos se chamam main.py).
 import importlib.util
 import sys
 from pathlib import Path

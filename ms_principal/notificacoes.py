@@ -1,13 +1,8 @@
 # Hub das notificacoes SSE do MS Principal (API Gateway).
-# Faz a ponte entre as threads que geram notificacoes (consumidor do RabbitMQ e
-# requisicoes HTTP) e o loop asyncio em que rodam as conexoes SSE: cada conexao
-# tem uma asyncio.Queue registrada para o e-mail do cliente; enviar() pode ser
-# chamado de qualquer thread e entrega o evento com loop.call_soon_threadsafe.
-# Todo evento recebe um id inteiro crescente (comeca no instante atual em ms,
-# entao continua crescendo apos um reinicio) e fica guardado em um buffer por
-# e-mail para reenvio quando o navegador reconecta (cabecalho Last-Event-ID).
-# No desligamento (Ctrl+C) encerrar() coloca None nas filas para que os streams
-# SSE terminem e o servidor nao precise cancela-los.
+# Recebe eventos de qualquer thread e os entrega as filas asyncio das conexoes
+# SSE de cada e-mail. Guarda um historico por e-mail para reenvio quando o
+# navegador reconecta (Last-Event-ID); os ids comecam no instante atual em ms
+# para continuarem crescendo apos um reinicio.
 import asyncio
 import threading
 import time
@@ -69,7 +64,7 @@ class HubNotificacoes:
             try:
                 self._loop.call_soon_threadsafe(_colocar, fila, item)
             except RuntimeError:
-                return  # loop ja encerrado (desligamento do processo)
+                return  # loop ja encerrado
 
     def _novo_item(self, evento, dados):
         self._ultimo_id += 1
@@ -99,8 +94,7 @@ class HubNotificacoes:
             return self._ultimo_id
 
     def encerrar(self):
-        # Chamado pelo tratador de sinal (Ctrl+C): nao pode usar o lock, que a
-        # thread interrompida pode estar segurando. A liberacao roda no loop.
+        # Roda no tratador de sinal: nao pode pegar o lock (risco de deadlock).
         self.encerrado = True
         loop = self._loop
         if loop is not None:

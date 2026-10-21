@@ -1,12 +1,7 @@
-# Persistencia do MS Estoque (SQLite, modulo sqlite3 da biblioteca padrao).
-# Tabela produtos: dados e quantidade em estoque de cada produto. Na primeira
-#   execucao e populada com o catalogo (common.catalogo.PRODUTOS); nas seguintes o
-#   estoque persistido e mantido (INSERT OR IGNORE nunca sobrescreve).
-# Tabela reservas: itens baixados do estoque para cada pedido (pedido.criado),
-#   usados para devolver o estoque quando o pedido e excluido (pedido.excluido).
-# Uma unica conexao e compartilhada pela thread consumidora do RabbitMQ e pelas
-# threads do FastAPI, protegida por um lock; reserva e devolucao sao atomicas
-# (uma transacao cada) e a reserva e idempotente por pedido (reentrega de evento).
+# Persistencia do MS Estoque (SQLite).
+# Tabela produtos: populada com o catalogo so na primeira execucao.
+# Tabela reservas: itens baixados por pedido, devolvidos quando ele e excluido.
+# Uma unica conexao compartilhada entre as threads, protegida por um lock.
 import json
 import sqlite3
 import threading
@@ -46,8 +41,7 @@ def _quantidade_valida(quantidade):
 
 
 def _consolidar(itens):
-    # Soma as quantidades dos codigos repetidos, na ordem do pedido. Uma quantidade
-    # invalida torna o codigo inteiro indisponivel (solicitado = valor recebido).
+    # Soma codigos repetidos; uma quantidade invalida torna o codigo todo indisponivel.
     consolidados = {}
     for item in itens:
         item = item if isinstance(item, dict) else {}
@@ -103,6 +97,7 @@ def _item_indisponivel(pedido, linha):
     }
 
 
+# PDF (0,1): persiste os dados dos produtos em estoque.
 class EstoqueDB:
     def __init__(self, caminho):
         caminho = Path(caminho)
@@ -204,7 +199,6 @@ class EstoqueDB:
             return {"ok": True, "itens": reservados, "valor_total": valor_total}
 
     def devolver(self, id_pedido):
-        # Devolve ao estoque os itens reservados para o pedido e apaga a reserva.
         with self._transacao() as conn:
             reserva = conn.execute(
                 "SELECT itens FROM reservas WHERE id_pedido = ?", (id_pedido,)

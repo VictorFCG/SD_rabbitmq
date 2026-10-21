@@ -1,7 +1,4 @@
-# Testes unitarios do MS Estoque (sem RabbitMQ, Docker ou outros processos):
-# persistencia SQLite (reserva, devolucao, idempotencia, concorrencia), tratamento
-# dos eventos pedido.criado/pedido.excluido com um publisher falso, verificacao da
-# assinatura do envelope e API REST consultada pelo API Gateway.
+# Testes do MS Estoque: SQLite, eventos (publisher falso) e API REST, sem RabbitMQ.
 import json
 import threading
 from types import SimpleNamespace
@@ -71,9 +68,6 @@ def publisher(db, monkeypatch):
 @pytest.fixture
 def cliente_http(publisher):
     return TestClient(estoque.app)
-
-
-# --- Persistencia (EstoqueDB) --------------------------------------------------
 
 
 def test_cria_pasta_e_popula_com_o_catalogo(tmp_path):
@@ -254,7 +248,7 @@ def test_estoque_e_reservas_persistem_ao_reabrir(tmp_path):
     banco.reservar("PED1", [{"codigo": "A1", "quantidade": 2}])
     banco.fechar()
 
-    reaberto = EstoqueDB(caminho)  # o catalogo nao sobrescreve o estoque gravado
+    reaberto = EstoqueDB(caminho)
     try:
         assert reaberto.estoque_atual()["A1"] == 1
         assert reaberto.obter_reserva("PED1")["valor_total"] == 9000.0
@@ -280,9 +274,6 @@ def test_reservas_concorrentes_nao_vendem_alem_do_estoque(db):
 
     assert sum(1 for r in resultados if r["ok"]) == PRODUTOS["A1"]["estoque"]
     assert db.estoque_atual()["A1"] == 0
-
-
-# --- Eventos (handler do consumidor) ------------------------------------------
 
 
 def test_importar_o_main_nao_tem_efeitos_colaterais():
@@ -466,8 +457,6 @@ def test_logs_somente_em_ascii(publisher, capsys):
 
 
 def test_evento_assinado_e_verificado_antes_do_handler(publisher, db, tmp_path):
-    # Chaves temporarias: o MS Estoque so processa eventos com assinatura valida
-    # do produtor (aqui, o MS Principal).
     privada, publica = generate_keypair()
     (tmp_path / "principal_private.pem").write_bytes(privada)
     (tmp_path / "principal_public.pem").write_bytes(publica)
@@ -493,9 +482,6 @@ def test_evento_assinado_e_verificado_antes_do_handler(publisher, db, tmp_path):
     assert [rk for _, rk, _ in publisher.publicados] == ["pedido.estoque_ok"]
     assert db.estoque_atual()["A1"] == 2
     assert canal.confirmados == [1, 2]
-
-
-# --- API REST -------------------------------------------------------------------
 
 
 def test_get_produtos_lista_todos(cliente_http):

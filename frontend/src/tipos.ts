@@ -59,7 +59,6 @@ export interface Pedido {
   id_cobranca: string | null;
   nota_fiscal: string | null;
   codigo_rastreio: string | null;
-  /** Texto pronto para exibir, montado pelo gateway (ex.: "Pedido cancelado pelo cliente."). */
   motivo: string | null;
   historico: EntradaHistorico[];
   criado_em: string;
@@ -101,13 +100,11 @@ export interface RespostaInteresse {
   categorias: string[];
 }
 
-/** Evento SSE "conectado". */
 export interface EventoConectado {
   email: string;
   timestamp: string;
 }
 
-/** Evento SSE "pedido". */
 export interface EventoPedido {
   tipo: string;
   mensagem: string;
@@ -115,5 +112,4 @@ export interface EventoPedido {
   timestamp: string;
 }
 
-/** Tom (cor) de avisos, notificações e selos. */
 export type Tom = "sucesso" | "erro" | "aviso" | "info" | "neutro" | "promocao";

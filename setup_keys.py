@@ -1,16 +1,8 @@
-# Geracao e distribuicao das chaves assimetricas (specs.txt, "Criptografia de
-# Chave Assimetrica"): "Os microsservicos devem possuir as chaves publicas de
-# todos os demais microsservicos. Criem uma pasta para cada microsservico e
-# salvem as chaves publicas nessas pastas."
-# Gera um par RSA por processo: a chave privada fica somente na pasta do seu
-# dono (usada para assinar) e as chaves publicas de todos sao copiadas para a
-# pasta de cada processo (usadas para verificar as assinaturas).
-# Trab2: os consumidores C1/C2 deram lugar aos clientes cadastrados por e-mail
-# (MS Promocoes), entao so os 5 microsservicos do backend possuem chaves. O Mock
-# de Pagamento e um sistema externo e nao participa do RabbitMQ.
-# As chaves so sao geradas quando faltam ou estao inconsistentes: assim os eventos
-# que ficaram nas filas duraveis continuam validos depois de reiniciar o sistema.
-# Para gerar chaves novas mesmo assim:  python setup_keys.py --force
+# Geracao e distribuicao das chaves assimetricas (um par RSA por microsservico).
+# A chave privada fica so na pasta do seu dono (assina os eventos) e as publicas
+# de todos sao copiadas para a pasta de cada um (verificam as assinaturas).
+# Chaves existentes e consistentes sao mantidas, para que os eventos das filas
+# duraveis continuem validos; python setup_keys.py --force gera chaves novas.
 import shutil
 import sys
 from pathlib import Path
@@ -31,8 +23,6 @@ PASTAS = {
 
 
 def chaves_completas(base):
-    # Cada pasta precisa da propria chave privada e das publicas de todos, e cada
-    # copia publica precisa corresponder a chave privada do seu dono.
     try:
         publicas = {}
         for servico in SERVICOS:

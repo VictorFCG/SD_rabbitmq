@@ -1,8 +1,6 @@
-# Pedidos do MS Principal (API Gateway): status, rotulos exibidos ao cliente,
-# transicoes de estado permitidas e persistencia em SQLite (ms_principal/data).
-# O banco e acessado pela thread consumidora do RabbitMQ e pelas threads das
-# requisicoes HTTP, entao toda operacao acontece sob um lock e a transicao de
-# status (le o status atual, valida e grava) e atomica.
+# Pedidos do MS Principal: status, transicoes permitidas e persistencia em
+# SQLite (ms_principal/data). Usado pela thread do consumidor e pelas threads
+# HTTP, por isso todo acesso passa por um lock.
 import json
 import sqlite3
 import threading
@@ -181,8 +179,6 @@ class PedidosDB:
             self._conn.execute("DELETE FROM pedidos WHERE id_pedido = ?", (id_pedido,))
 
     def transicionar(self, id_pedido, novo_status, mensagem, **campos):
-        # Retorna (pedido, aplicado). Transicao nao permitida -> (pedido atual,
-        # False); pedido desconhecido -> (None, False).
         desconhecidos = set(campos) - set(CAMPOS_ATUALIZAVEIS)
         if desconhecidos:
             raise ValueError(f"campos nao atualizaveis: {sorted(desconhecidos)}")

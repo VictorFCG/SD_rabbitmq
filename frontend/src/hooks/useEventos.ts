@@ -1,11 +1,5 @@
-// Conexão SSE com o API Gateway (GET /api/eventos?email=...).
-// - O EventSource reconecta sozinho (reenviando Last-Event-ID) quando a conexão cai;
-//   se ele desistir (readyState CLOSED, ex.: resposta HTTP de erro), um novo é criado
-//   com espera exponencial, pedindo os eventos perdidos via ?ultimo_id=.
-// - Eventos repetidos (mesmo id SSE ou mesmo conteúdo, comum após um reenvio) são
-//   ignorados.
-// - Fecha a conexão ao desmontar ou trocar de e-mail; funciona com o StrictMode (o
-//   efeito pode montar, desmontar e montar de novo).
+// O EventSource reconecta sozinho quando a conexão cai, mas desiste (CLOSED) diante de um erro
+// HTTP; aí um novo é criado com espera exponencial, pedindo os eventos perdidos via ?ultimo_id=.
 import { useEffect, useEffectEvent, useState } from "react";
 import { urlEventos } from "../api";
 import { ehObjeto, normalizarEventoPedido, normalizarPromocao } from "../normalizar";
@@ -37,7 +31,6 @@ function idDoEvento(evento: Event): string {
   return evento instanceof MessageEvent ? evento.lastEventId : "";
 }
 
-/** Conjunto limitado: esquece os itens mais antigos ao passar do limite. */
 function criarMemoria(limite: number) {
   const itens = new Set<string>();
   const ordem: string[] = [];
@@ -52,6 +45,7 @@ function criarMemoria(limite: number) {
   };
 }
 
+// PDF (Frontend 0,5): conexão SSE com o API Gateway para acompanhar o status dos pedidos.
 export function useEventos(email: string, manipuladores: ManipuladoresEventos): EstadoConexao {
   const [estado, setEstado] = useState<EstadoConexao>("conectando");
 
@@ -69,7 +63,7 @@ export function useEventos(email: string, manipuladores: ManipuladoresEventos): 
     const idsVistos = criarMemoria(MAXIMO_LEMBRADOS);
     const conteudosVistos = criarMemoria(MAXIMO_LEMBRADOS);
 
-    // true se o evento é novo; registra id e conteúdo para descartar repetições.
+    // Após um reenvio podem chegar eventos repetidos (mesmo id ou mesmo conteúdo).
     const ehNovo = (evento: Event, chaveConteudo: string): boolean => {
       const id = idDoEvento(evento);
       if (id) ultimoId = id;

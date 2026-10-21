@@ -1,4 +1,3 @@
-// Catálogo vindo do MS Estoque (via GET /api/produtos do API Gateway).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listarProdutos, mensagemDeErro } from "../api";
 import type { Produto } from "../tipos";
@@ -10,7 +9,6 @@ export interface Catalogo {
   erro: string | null;
   atualizadoEm: number | null;
   recarregar: () => Promise<void>;
-  /** Recarrega depois de um intervalo (eventos de pedido mudam o estoque). */
   agendarRecarga: (atrasoMs?: number) => void;
 }
 
